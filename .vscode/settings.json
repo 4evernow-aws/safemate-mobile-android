@@ -1,0 +1,23 @@
+{
+  "typescript.preferences.importModuleSpecifier": "relative",
+  "emmet.includeLanguages": {
+    "typescript": "typescriptreact"
+  },
+  "react-native-tools.showUserTips": false,
+  "react-native-tools.projectRoot": "./",
+  "react-native-tools.androidProjectPath": "./android",
+  "editor.formatOnSave": true,
+  "editor.codeActionsOnSave": {
+    "source.fixAll.eslint": "explicit"
+  },
+  "files.exclude": {
+    "**/node_modules": true,
+    "**/android/app/build": true,
+    "**/ios/build": true
+  },
+  "search.exclude": {
+    "**/node_modules": true,
+    "**/android/app/build": true,
+    "**/ios/build": true
+  }
+}
