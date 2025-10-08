@@ -24,6 +24,7 @@ import SelfFundedWalletManager from '../services/blockchain/SelfFundedWalletMana
 import DatabaseService from '../database/DatabaseService';
 import CryptoService from '../services/CryptoService';
 import { PasswordUtils } from '../utils/PasswordUtils';
+import OnboardingFlow from './OnboardingFlow';
 
 interface AuthScreenProps {
   onAuthSuccess: (userType: 'existing' | 'new', userData?: any) => void;
@@ -42,6 +43,7 @@ const AuthScreen: React.FC<AuthScreenProps> = ({ onAuthSuccess }) => {
   const [currentStage, setCurrentStage] = useState<string>('');
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const [showOnboarding, setShowOnboarding] = useState(false);
 
   // Password strength calculation
   const getPasswordStrength = (pwd: string) => {
@@ -768,18 +770,33 @@ const AuthScreen: React.FC<AuthScreenProps> = ({ onAuthSuccess }) => {
 
       <TouchableOpacity
         style={[styles.optionButton, isDarkMode && styles.darkOptionButton]}
-        onPress={() => setAuthMode('signup')}
+        onPress={() => setShowOnboarding(true)}
       >
         <Text style={[styles.optionButtonText, isDarkMode && styles.darkText]}>
           Create Account
         </Text>
         <Text style={[styles.optionButtonSubtext, isDarkMode && styles.darkSubtext]}>
-          New to SafeMate? Get started
+          New to SafeMate? Get started with our enhanced onboarding
         </Text>
       </TouchableOpacity>
 
     </View>
   );
+
+  // Show onboarding flow if enabled
+  if (showOnboarding) {
+    return (
+      <OnboardingFlow
+        onComplete={(userData) => {
+          setShowOnboarding(false);
+          onAuthSuccess('new', userData);
+        }}
+        onCancel={() => {
+          setShowOnboarding(false);
+        }}
+      />
+    );
+  }
 
   return (
     <SafeAreaView style={[styles.container, isDarkMode && styles.darkContainer]}>

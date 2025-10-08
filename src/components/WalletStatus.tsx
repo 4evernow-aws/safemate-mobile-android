@@ -3,7 +3,7 @@
  * Displays user account details with Hedera account information
  */
 
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -11,6 +11,7 @@ import {
   TouchableOpacity,
   useColorScheme,
 } from 'react-native';
+import WalletManager from '../services/blockchain/WalletManager';
 
 interface AccountDetailsProps {
   connected: boolean;
@@ -25,6 +26,9 @@ interface AccountDetailsProps {
 
 const AccountDetails: React.FC<AccountDetailsProps> = ({ connected, userData }) => {
   const isDarkMode = useColorScheme() === 'dark';
+  const [hbarBalance, setHbarBalance] = useState<number>(0);
+  const [audBalance, setAudBalance] = useState<number>(0);
+  const [isLoadingBalance, setIsLoadingBalance] = useState(false);
 
   // Get display name from user data
   const displayName = userData?.firstName && userData?.lastName 
@@ -35,6 +39,47 @@ const AccountDetails: React.FC<AccountDetailsProps> = ({ connected, userData }) 
   const hederaAccountNumber = userData?.accountId && userData.accountId !== 'Unknown' 
     ? userData.accountId 
     : 'Unknown';
+
+  // HBAR to AUD conversion rate (this would typically come from an API)
+  const HBAR_TO_AUD_RATE = 0.05; // Example rate: 1 HBAR = $0.05 AUD
+
+  // Convert tinybars to HBAR (1 HBAR = 100,000,000 tinybars)
+  const tinybarsToHbar = (tinybars: number): number => {
+    return tinybars / 100000000;
+  };
+
+  // Convert HBAR to AUD
+  const hbarToAud = (hbar: number): number => {
+    return hbar * HBAR_TO_AUD_RATE;
+  };
+
+  // Load wallet balance
+  const loadWalletBalance = async () => {
+    if (!userData?.walletId || hederaAccountNumber === 'Unknown') {
+      return;
+    }
+
+    setIsLoadingBalance(true);
+    try {
+      const balance = await WalletManager.getWalletBalance(userData.walletId);
+      const hbar = tinybarsToHbar(balance);
+      const aud = hbarToAud(hbar);
+      
+      setHbarBalance(hbar);
+      setAudBalance(aud);
+    } catch (error) {
+      console.error('Failed to load wallet balance:', error);
+      setHbarBalance(0);
+      setAudBalance(0);
+    } finally {
+      setIsLoadingBalance(false);
+    }
+  };
+
+  // Load balance when component mounts or wallet changes
+  useEffect(() => {
+    loadWalletBalance();
+  }, [userData?.walletId, hederaAccountNumber]);
 
   return (
     <View style={[styles.container, isDarkMode && styles.darkContainer]}>
@@ -81,6 +126,46 @@ const AccountDetails: React.FC<AccountDetailsProps> = ({ connected, userData }) 
               </Text>
             </View>
           </View>
+
+          {/* Balance Section */}
+          {hederaAccountNumber !== 'Unknown' && (
+            <View style={styles.balanceSection}>
+              <View style={styles.balanceHeader}>
+                <Text style={[styles.balanceTitle, isDarkMode && styles.darkText]}>
+                  💰 Account Balance
+                </Text>
+                <TouchableOpacity
+                  style={styles.refreshButton}
+                  onPress={loadWalletBalance}
+                  disabled={isLoadingBalance}
+                >
+                  <Text style={styles.refreshButtonText}>
+                    {isLoadingBalance ? '⟳' : '🔄'}
+                  </Text>
+                </TouchableOpacity>
+              </View>
+              
+              <View style={styles.balanceContainer}>
+                <View style={styles.balanceRow}>
+                  <Text style={[styles.balanceLabel, isDarkMode && styles.darkSubtext]}>
+                    HBAR Balance:
+                  </Text>
+                  <Text style={[styles.balanceValue, isDarkMode && styles.darkText]}>
+                    {isLoadingBalance ? 'Loading...' : `${hbarBalance.toFixed(4)} HBAR`}
+                  </Text>
+                </View>
+                
+                <View style={styles.balanceRow}>
+                  <Text style={[styles.balanceLabel, isDarkMode && styles.darkSubtext]}>
+                    AUD Value:
+                  </Text>
+                  <Text style={[styles.balanceValue, isDarkMode && styles.darkText]}>
+                    {isLoadingBalance ? 'Loading...' : `$${audBalance.toFixed(2)} AUD`}
+                  </Text>
+                </View>
+              </View>
+            </View>
+          )}
         </View>
         
         
@@ -178,6 +263,55 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: '#7f8c8d',
     marginBottom: 4,
+  },
+  balanceSection: {
+    marginTop: 16,
+    paddingTop: 16,
+    borderTopWidth: 1,
+    borderTopColor: '#ecf0f1',
+  },
+  balanceHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  balanceTitle: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#2c3e50',
+  },
+  refreshButton: {
+    padding: 8,
+    borderRadius: 6,
+    backgroundColor: '#3498db',
+  },
+  refreshButtonText: {
+    fontSize: 16,
+    color: '#ffffff',
+  },
+  balanceContainer: {
+    backgroundColor: '#ffffff',
+    padding: 12,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#ecf0f1',
+  },
+  balanceRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  balanceLabel: {
+    fontSize: 14,
+    color: '#7f8c8d',
+    fontWeight: '500',
+  },
+  balanceValue: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#27ae60',
   },
 });
 
