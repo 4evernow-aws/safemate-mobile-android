@@ -20,6 +20,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import WalletManager from '../services/blockchain/WalletManager';
+import SelfFundedWalletManager from '../services/blockchain/SelfFundedWalletManager';
 import DatabaseService from '../database/DatabaseService';
 import CryptoService from '../services/CryptoService';
 import { PasswordUtils } from '../utils/PasswordUtils';
@@ -133,8 +134,8 @@ const AuthScreen: React.FC<AuthScreenProps> = ({ onAuthSuccess }) => {
       setCurrentStage('Updating login status...');
       await DatabaseService.updateUserLastLogin(existingUser.id);
       
-      // Load existing wallet if available
-      setCurrentStage('Loading blockchain wallet...');
+      // Load existing account if available
+      setCurrentStage('Loading blockchain account...');
       let wallet = null;
       let hederaAccountId = 'Unknown';
       
@@ -142,12 +143,38 @@ const AuthScreen: React.FC<AuthScreenProps> = ({ onAuthSuccess }) => {
         wallet = await WalletManager.getActiveWallet();
         if (wallet) {
           hederaAccountId = wallet.accountId;
-          console.log('Signing in with existing wallet:', wallet.accountId);
+          console.log('Signing in with existing account:', wallet.accountId);
         } else {
-          console.log('No existing wallet found');
+          console.log('No existing account found');
         }
       } catch (walletError) {
-        console.warn('Error loading wallet:', walletError);
+        console.warn('Error loading account:', walletError);
+      }
+
+      // If user has no Hedera account yet, attempt to create it now
+      if (!wallet || hederaAccountId === 'Unknown') {
+        setCurrentStage('Creating Hedera blockchain account...');
+        console.log('No valid Hedera account detected on sign-in. Attempting creation...');
+        try {
+          const newWallet = await WalletManager.createWallet();
+          wallet = newWallet;
+          hederaAccountId = newWallet.accountId;
+          console.log('Hedera account created on sign-in:', hederaAccountId);
+          // Update user record with account info
+          try {
+            await DatabaseService.updateUserWallet(existingUser.id, newWallet.id);
+            console.log('User record updated with new account after sign-in');
+          } catch (updateErr) {
+            console.warn('Failed to update user account reference after sign-in:', updateErr);
+          }
+        } catch (createErr) {
+          console.warn('Hedera account creation during sign-in failed:', createErr);
+          Alert.alert(
+            'Blockchain Account Setup Failed',
+            'We could not create your Hedera account right now. You are signed in and can try again later.',
+            [{ text: 'OK' }]
+          );
+        }
       }
       
       // Show success message and wait before proceeding
@@ -277,34 +304,119 @@ const AuthScreen: React.FC<AuthScreenProps> = ({ onAuthSuccess }) => {
         const testString = CryptoService.generateRandomString(16);
         console.log('Test random string generated:', testString);
         
-        // Step 5: Create Hedera account
-        setCurrentStage('Creating Hedera blockchain account...');
-        console.log('Creating Hedera account for new user...');
+        // Step 5: Create self-funded Hedera account
+        setCurrentStage('Setting up blockchain account...');
+        console.log('Setting up self-funded Hedera account for new user...');
         
         let hederaAccountId = 'Unknown';
         let hasWallet = false;
         
         try {
-          const wallet = await WalletManager.createWallet();
-          hederaAccountId = wallet.accountId;
-          hasWallet = true;
-          console.log('Hedera account created successfully:', hederaAccountId);
+          // Show funding options to user
+          const fundingResult = await SelfFundedWalletManager.showFundingOptions(
+            newUser.email,
+            newUser.id
+          );
           
-          // Update user record with wallet info
-          await DatabaseService.updateUserWallet(newUser.id, wallet.id);
-          console.log('User record updated with wallet information');
+          if (!fundingResult) {
+            // User cancelled funding
+            Alert.alert(
+              'Account Creation Cancelled',
+              'You cancelled the account funding process. You can create a blockchain account later from the app settings.',
+              [
+                {
+                  text: 'Continue Without Account',
+                  onPress: () => {
+                    // Continue with account creation without wallet
+                    setCurrentStage('Account created successfully!');
+                    Alert.alert(
+                      'Account Created Successfully! 🎉',
+                      `Welcome to SafeMate, ${firstName}! Your account has been created. You can add a blockchain account later.`,
+                      [
+                        {
+                          text: 'Continue',
+                          onPress: () => {
+                            setCurrentStage('');
+        onAuthSuccess('new', { 
+                              id: newUser.id,
+                              firstName: newUser.firstName, 
+                              lastName: newUser.lastName, 
+                              email: newUser.email, 
+          type: 'email',
+                              hasWallet: false,
+                              accountId: 'Unknown'
+                            });
+                          }
+                        }
+                      ]
+                    );
+                  }
+                },
+                {
+                  text: 'Try Again',
+                  onPress: () => {
+                    setIsLoading(false);
+                    setIsCreatingWallet(false);
+                    setCurrentStage('');
+                  }
+                }
+              ]
+            );
+            return;
+          }
+          
+          if (!fundingResult.success) {
+            throw new Error(fundingResult.error || 'Wallet funding failed');
+          }
+          
+          // Account created successfully
+          hederaAccountId = fundingResult.wallet!.accountId;
+          hasWallet = true;
+          console.log('Self-funded account created successfully:', hederaAccountId);
+          
+          // Update user record with account info
+          await DatabaseService.updateUserWallet(newUser.id, fundingResult.wallet!.id);
+          console.log('User record updated with account information');
           
         } catch (hederaError) {
-          console.error('Hedera account creation failed:', hederaError);
+          console.error('Self-funded account creation failed:', hederaError);
           const errorMessage = hederaError instanceof Error ? hederaError.message : 'Unknown error occurred';
           
           // Show error to user and don't proceed with account creation
           Alert.alert(
-            'Blockchain Account Creation Failed',
-            `Unable to create Hedera blockchain account: ${errorMessage}\n\nPlease try again or contact support if the issue persists.`,
+            'Account Creation Failed',
+            `Unable to create your blockchain account: ${errorMessage}\n\nYou can try again later or contact support if the issue persists.`,
             [
               {
-                text: 'OK',
+                text: 'Continue Without Account',
+                onPress: () => {
+                  // Continue with account creation without wallet
+                  setCurrentStage('Account created successfully!');
+                  Alert.alert(
+                    'Account Created Successfully! 🎉',
+                    `Welcome to SafeMate, ${firstName}! Your account has been created. You can add a blockchain account later.`,
+                    [
+                      {
+                        text: 'Continue',
+                        onPress: () => {
+                          setCurrentStage('');
+        onAuthSuccess('new', { 
+                            id: newUser.id,
+                            firstName: newUser.firstName, 
+                            lastName: newUser.lastName, 
+                            email: newUser.email, 
+          type: 'email',
+          hasWallet: false,
+                            accountId: 'Unknown'
+                          });
+                        }
+                      }
+                    ]
+                  );
+                }
+              },
+              {
+                text: 'Try Again',
                 onPress: () => {
                   setIsLoading(false);
                   setIsCreatingWallet(false);
@@ -322,7 +434,7 @@ const AuthScreen: React.FC<AuthScreenProps> = ({ onAuthSuccess }) => {
           
           // Show success message
           setCurrentStage('Account created successfully!');
-          const successMessage = `Welcome to SafeMate, ${firstName}! Your account has been created with Hedera blockchain integration. Account: ${hederaAccountId}`;
+          const successMessage = `Welcome to SafeMate, ${firstName}! Your account has been created with Hedera blockchain integration. Blockchain Account: ${hederaAccountId}`;
           
           Alert.alert(
             'Account Created Successfully! 🎉',
@@ -418,12 +530,12 @@ const AuthScreen: React.FC<AuthScreenProps> = ({ onAuthSuccess }) => {
       />
 
       <View style={styles.passwordContainer}>
-        <TextInput
+      <TextInput
           style={[styles.input, styles.passwordInput, isDarkMode && styles.darkInput]}
-          placeholder="Password"
-          placeholderTextColor={isDarkMode ? '#bdc3c7' : '#7f8c8d'}
-          value={password}
-          onChangeText={setPassword}
+        placeholder="Password"
+        placeholderTextColor={isDarkMode ? '#bdc3c7' : '#7f8c8d'}
+        value={password}
+        onChangeText={setPassword}
           secureTextEntry={!showPassword}
         />
         <TouchableOpacity
@@ -515,12 +627,12 @@ const AuthScreen: React.FC<AuthScreenProps> = ({ onAuthSuccess }) => {
       />
 
       <View style={styles.passwordContainer}>
-        <TextInput
+      <TextInput
           style={[styles.input, styles.passwordInput, isDarkMode && styles.darkInput]}
-          placeholder="Password"
-          placeholderTextColor={isDarkMode ? '#bdc3c7' : '#7f8c8d'}
-          value={password}
-          onChangeText={setPassword}
+        placeholder="Password"
+        placeholderTextColor={isDarkMode ? '#bdc3c7' : '#7f8c8d'}
+        value={password}
+        onChangeText={setPassword}
           secureTextEntry={!showPassword}
         />
         <TouchableOpacity
@@ -542,7 +654,7 @@ const AuthScreen: React.FC<AuthScreenProps> = ({ onAuthSuccess }) => {
       )}
 
       <View style={styles.passwordContainer}>
-        <TextInput
+      <TextInput
           style={[
             styles.input, 
             styles.passwordInput,
@@ -552,10 +664,10 @@ const AuthScreen: React.FC<AuthScreenProps> = ({ onAuthSuccess }) => {
               borderWidth: 2
             }
           ]}
-          placeholder="Confirm Password"
-          placeholderTextColor={isDarkMode ? '#bdc3c7' : '#7f8c8d'}
-          value={confirmPassword}
-          onChangeText={setConfirmPassword}
+        placeholder="Confirm Password"
+        placeholderTextColor={isDarkMode ? '#bdc3c7' : '#7f8c8d'}
+        value={confirmPassword}
+        onChangeText={setConfirmPassword}
           secureTextEntry={!showConfirmPassword}
         />
         <TouchableOpacity
@@ -582,7 +694,7 @@ const AuthScreen: React.FC<AuthScreenProps> = ({ onAuthSuccess }) => {
       {isLoading && (
         <View style={styles.loadingContainer}>
           <Text style={[styles.loadingText, isDarkMode && styles.darkText]}>
-            {isCreatingWallet ? 'Creating your blockchain wallet...' : 'Creating your account, please wait...'}
+            {isCreatingWallet ? 'Creating your blockchain account...' : 'Creating your account, please wait...'}
           </Text>
           {isCreatingWallet && (
             <Text style={[styles.loadingSubtext, isDarkMode && styles.darkSubtext]}>
@@ -602,7 +714,7 @@ const AuthScreen: React.FC<AuthScreenProps> = ({ onAuthSuccess }) => {
         disabled={isLoading}
       >
         <Text style={styles.buttonText}>
-          {isCreatingWallet ? 'Creating Wallet...' : isLoading ? 'Creating Account...' : 'Create Account'}
+          {isCreatingWallet ? 'Creating Account...' : isLoading ? 'Creating Account...' : 'Create Account'}
         </Text>
       </TouchableOpacity>
 
