@@ -218,6 +218,9 @@ function App() {
           onPress: async (folderName) => {
             if (folderName && folderName.trim()) {
               try {
+                console.log('Creating folder:', folderName.trim());
+                
+                // Create folder in database
                 const newFolder = await DataService.createFolder({
                   name: folderName.trim(),
                   type: 'personal', // Default type
@@ -226,11 +229,42 @@ function App() {
                   isEncrypted: true,
                 });
                 
+                console.log('Folder created in database:', newFolder.id);
+                
+                // Sync folder to blockchain to create NFT
+                if (walletConnected && newFolder.isBlockchain) {
+                  console.log('Syncing folder to blockchain...');
+                  try {
+                    const syncResult = await BlockchainSyncService.syncFolderToBlockchain(newFolder.id);
+                    if (syncResult.success) {
+                      console.log('Folder synced to blockchain successfully:', syncResult.blockchainTokenId);
+                      Alert.alert(
+                        'Success! 🎉', 
+                        `Folder "${folderName.trim()}" created successfully!\n\nBlockchain NFT: ${syncResult.blockchainTokenId}`
+                      );
+                    } else {
+                      console.warn('Blockchain sync failed:', syncResult.error);
+                      Alert.alert(
+                        'Folder Created (Offline)', 
+                        `Folder "${folderName.trim()}" created locally. It will sync to blockchain when online.`
+                      );
+                    }
+                  } catch (syncError) {
+                    console.error('Blockchain sync error:', syncError);
+                    Alert.alert(
+                      'Folder Created (Offline)', 
+                      `Folder "${folderName.trim()}" created locally. It will sync to blockchain when online.`
+                    );
+                  }
+                } else {
+                  console.log('Wallet not connected or folder not set for blockchain');
+                  Alert.alert('Success', `Folder "${folderName.trim()}" created successfully!`);
+                }
+                
                 // Refresh folders list
                 const updatedFolders = await DataService.getFolders();
                 setFolders(updatedFolders);
                 
-                Alert.alert('Success', 'Folder created successfully!');
               } catch (error) {
                 console.error('Failed to create folder:', error);
                 Alert.alert('Error', 'Failed to create folder');
