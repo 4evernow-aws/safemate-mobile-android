@@ -70,15 +70,49 @@ class BlockchainSyncService {
 
       console.log('Syncing folder to blockchain:', folder.name);
 
-      // Create folder token on blockchain
+      // Ensure wallet is set as operator before creating tokens
+      console.log('Getting active wallet for blockchain operations...');
+      const wallet = await WalletManager.getActiveWallet();
+      console.log('Active wallet result:', wallet ? `Found wallet ${wallet.accountId}` : 'No active wallet found');
+      
+      if (wallet) {
+        HederaService.setWallet(wallet);
+        console.log('Wallet set as operator for folder token creation:', wallet.accountId);
+      } else {
+        // Try to get any wallet if no active wallet is found
+        console.log('No active wallet found, trying to get any wallet...');
+        const wallets = await DatabaseService.getWallets();
+        console.log('Available wallets:', wallets.length);
+        
+        if (wallets.length > 0) {
+          const firstWallet = await WalletManager.loadWallet(wallets[0].id);
+          if (firstWallet) {
+            HederaService.setWallet(firstWallet);
+            console.log('Using first available wallet for folder token creation:', firstWallet.accountId);
+          } else {
+            throw new Error('Failed to load wallet for blockchain operations');
+          }
+        } else {
+          throw new Error('No wallet available for blockchain operations');
+        }
+      }
+
+      // Determine if this is a parent folder or subfolder based on parentId
+      const isSubfolder = folder.parentId !== null && folder.parentId !== undefined;
+      
+      // Create folder token on blockchain with hierarchical support
       const tokenResult = await HederaService.createFolderToken(
         folder.name,
         folder.description || '',
         {
-          type: folder.type,
+          type: isSubfolder ? 'subfolder' : 'parent',
           fileCount: folder.fileCount,
           createdAt: folder.createdAt.toISOString(),
           isEncrypted: folder.isEncrypted,
+          hierarchical: true,
+          canContain: ['subfolders', 'files'],
+          maxChildren: 10000,
+          parentId: folder.parentId
         }
       );
 
@@ -171,7 +205,7 @@ class BlockchainSyncService {
         }
       );
 
-      // Mint NFT for the file
+      // Mint NFT for the file - associated with parent folder token
       const nftResult = await HederaService.mintFileNFT(
         folder.blockchainTokenId,
         {
@@ -180,6 +214,8 @@ class BlockchainSyncService {
           size: file.size,
           type: file.type,
           checksum: file.checksum,
+          parentTokenId: folder.blockchainTokenId,
+          associatedWith: 'folder'
         }
       );
 

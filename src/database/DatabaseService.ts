@@ -354,6 +354,16 @@ class DatabaseService {
     return this.mapFilesFromResults(results);
   }
 
+  async getAllFiles(): Promise<File[]> {
+    if (!this.db) throw new Error('Database not initialized');
+
+    const [results] = await this.db.executeSql(
+      'SELECT * FROM files ORDER BY uploadedAt DESC'
+    );
+
+    return this.mapFilesFromResults(results);
+  }
+
   async getFileById(id: string): Promise<File | null> {
     if (!this.db) throw new Error('Database not initialized');
 

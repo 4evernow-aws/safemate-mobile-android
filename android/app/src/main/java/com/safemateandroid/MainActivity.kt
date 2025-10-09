@@ -1,5 +1,6 @@
 package com.safemateandroid
 
+import android.os.Bundle
 import com.facebook.react.ReactActivity
 import com.facebook.react.ReactActivityDelegate
 import com.facebook.react.defaults.DefaultNewArchitectureEntryPoint.fabricEnabled
@@ -19,4 +20,18 @@ class MainActivity : ReactActivity() {
    */
   override fun createReactActivityDelegate(): ReactActivityDelegate =
       DefaultReactActivityDelegate(this, mainComponentName, fabricEnabled)
+
+  override fun onCreate(savedInstanceState: Bundle?) {
+    super.onCreate(savedInstanceState)
+    
+    // Prevent system overlays and search bars
+    window.decorView.systemUiVisibility = (
+      android.view.View.SYSTEM_UI_FLAG_LAYOUT_STABLE or
+      android.view.View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION or
+      android.view.View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN or
+      android.view.View.SYSTEM_UI_FLAG_HIDE_NAVIGATION or
+      android.view.View.SYSTEM_UI_FLAG_FULLSCREEN or
+      android.view.View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY
+    )
+  }
 }

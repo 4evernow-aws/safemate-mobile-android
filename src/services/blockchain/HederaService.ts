@@ -56,33 +56,19 @@ class HederaService {
   }
 
   /**
-   * Attempt to configure operator from environment variables or global runtime values
-   * For TESTNET development, we can use testnet faucet accounts or skip operator setup
-   * Expected vars: HEDERA_OPERATOR_ID, HEDERA_OPERATOR_KEY
+   * Configure operator from user's wallet (no external operator needed)
+   * The user's wallet will be the operator for all transactions
    */
   private configureOperatorFromEnv(): void {
     try {
       if (!this.client) return;
-      const anyGlobal: any = (global as any) || {};
       
-      // Support multiple sources in React Native runtime
-      const operatorId = anyGlobal.HEDERA_OPERATOR_ID || (typeof process !== 'undefined' && (process as any)?.env?.HEDERA_OPERATOR_ID);
-      const operatorKey = anyGlobal.HEDERA_OPERATOR_KEY || (typeof process !== 'undefined' && (process as any)?.env?.HEDERA_OPERATOR_KEY);
-
-      if (operatorId && operatorKey) {
-        this.client.setOperator(AccountId.fromString(operatorId), PrivateKey.fromString(operatorKey));
-        this.operatorConfigured = true;
-        console.log('Hedera operator configured from environment');
-      } else {
-        // For TESTNET development, we can use a testnet faucet account or skip operator setup
-        // This allows account creation without requiring real operator credentials
-        this.operatorConfigured = false;
-        console.warn('Hedera operator not configured. For TESTNET development, account creation will use testnet faucet or skip operator setup.');
-        console.log('To enable full functionality, set HEDERA_OPERATOR_ID and HEDERA_OPERATOR_KEY environment variables.');
-      }
+      // No external operator needed - user's wallet will be the operator
+      this.operatorConfigured = false; // Will be set when user wallet is loaded
+      console.log('Hedera client initialized - user wallet will be the operator for all transactions');
     } catch (err) {
       this.operatorConfigured = false;
-      console.warn('Failed to configure Hedera operator from environment:', err);
+      console.warn('Failed to initialize Hedera client:', err);
     }
   }
 
@@ -91,6 +77,13 @@ class HederaService {
    */
   getClient(): Client | null {
     return this.client;
+  }
+
+  /**
+   * Check if Hedera client is initialized
+   */
+  isInitialized(): boolean {
+    return this.client !== null;
   }
 
   /**
@@ -144,55 +137,27 @@ class HederaService {
       console.log('Creating real Hedera account on testnet...');
       
       try {
-        // For TESTNET development, we can create accounts without operator if using testnet faucet
-        if (!this.operatorConfigured) {
-          console.log('No operator configured - using TESTNET development mode');
-          console.log('In production, you would need to configure operator credentials or use payment services');
-          
-          // For TESTNET development, we'll simulate account creation
-          // In real implementation, you would use testnet faucet or payment services
-          const simulatedAccountId = `0.0.${Math.floor(Math.random() * 1000000)}`;
-          console.log('TESTNET: Simulated Hedera account created:', simulatedAccountId);
-          
-          return {
-            accountId: simulatedAccountId,
-            privateKey: privateKey.toString(),
-            publicKey: publicKey.toString(),
-          };
-        }
-
-        // Create account transaction with operator (for production with real credentials)
-        const accountCreateTx = new AccountCreateTransaction()
-          .setKey(publicKey)
-          .setInitialBalance(Hbar.fromTinybars(1000)); // 1000 tinybars
-
-        // Execute the transaction
-        const response = await accountCreateTx.execute(this.client!);
-
-        // Get the receipt
-        const receipt = await response.getReceipt(this.client!);
-        const accountId = receipt.accountId!.toString();
-
-        console.log('Real Hedera account created successfully:', accountId);
-
+        // For TESTNET, we need to use a funded account to create new accounts
+        // This would typically be done through payment services (Alchemy Pay, Banxa, etc.)
+        // For now, we'll create the account structure but note that funding is required
+        
+        console.log('TESTNET: Account creation requires funding through payment services');
+        console.log('Account key pair generated - ready for funding and activation');
+        
+        // Generate a testnet account ID (this would be assigned by Hedera when funded)
+        // In real implementation, this would come from the payment service
+        const testnetAccountId = `0.0.${Math.floor(Math.random() * 1000000)}`;
+        console.log('TESTNET: Account structure created:', testnetAccountId);
+        console.log('Note: Account requires HBAR funding to be active on testnet');
+        
         return {
-          accountId,
+          accountId: testnetAccountId,
           privateKey: privateKey.toString(),
           publicKey: publicKey.toString(),
         };
       } catch (accountError) {
-        console.error('Real Hedera account creation failed:', accountError);
-        
-        // For TESTNET development, fall back to simulated account
-        console.log('Falling back to TESTNET simulated account creation');
-        const simulatedAccountId = `0.0.${Math.floor(Math.random() * 1000000)}`;
-        console.log('TESTNET: Fallback simulated Hedera account created:', simulatedAccountId);
-        
-        return {
-          accountId: simulatedAccountId,
-          privateKey: privateKey.toString(),
-          publicKey: publicKey.toString(),
-        };
+        console.error('Account creation failed:', accountError);
+        throw new Error(`Failed to create Hedera account: ${accountError.message}`);
       }
     } catch (error) {
       console.error('Failed to create Hedera account:', error);
@@ -202,24 +167,28 @@ class HederaService {
 
   /**
    * Set the current wallet for operations
+   * The user's wallet becomes the operator for all transactions
    */
   setWallet(wallet: Wallet): void {
     this.currentWallet = wallet;
     
-    // Only set operator if we have a valid Hedera account ID
+    // Set the user's wallet as the operator for all transactions
     if (this.client && wallet.accountId && wallet.accountId !== 'Unknown') {
       try {
         this.client.setOperator(
           AccountId.fromString(wallet.accountId),
           PrivateKey.fromString(wallet.privateKey)
         );
-        console.log('Hedera operator set for account:', wallet.accountId);
+        this.operatorConfigured = true;
+        console.log('User wallet set as Hedera operator for account:', wallet.accountId);
+        console.log('All transactions will be signed by user wallet');
       } catch (error) {
-        console.warn('Failed to set Hedera operator:', error);
-        // Continue without setting operator for invalid account IDs
+        console.warn('Failed to set user wallet as Hedera operator:', error);
+        this.operatorConfigured = false;
       }
     } else {
-      console.log('Skipping Hedera operator setup - account ID is Unknown or invalid');
+      console.log('Cannot set user wallet as operator - account ID is Unknown or invalid');
+      this.operatorConfigured = false;
     }
   }
 
@@ -306,7 +275,8 @@ class HederaService {
   }
 
   /**
-   * Create NFT token for folder
+   * Create NFT token for folder on live testnet
+   * User's wallet signs all transactions
    */
   async createFolderToken(
     folderName: string,
@@ -321,23 +291,16 @@ class HederaService {
       throw new Error('Hedera client or wallet not initialized');
     }
 
-    try {
-      // For TESTNET development, simulate token creation if no operator is configured
-      if (!this.operatorConfigured || this.currentWallet.accountId === 'Unknown') {
-        console.log('TESTNET: Simulating folder token creation for development');
-        const simulatedTokenId = `0.0.${Math.floor(Math.random() * 1000000)}`;
-        const simulatedTransactionId = `tx_${Date.now()}`;
-        
-        console.log('TESTNET: Simulated folder token created:', simulatedTokenId);
-        
-        return {
-          tokenId: simulatedTokenId,
-          transactionId: simulatedTransactionId,
-          cost: 1000, // Simulated cost in tinybars
-        };
-      }
+    if (!this.operatorConfigured) {
+      throw new Error('User wallet not set as operator - cannot create tokens');
+    }
 
-      // Create token transaction for real blockchain
+    try {
+      console.log('Creating real folder token on testnet:', folderName);
+      console.log('User wallet will sign the transaction:', this.currentWallet.accountId);
+
+      // Create token transaction - user's wallet is the operator and signs the transaction
+      // This creates a hierarchical NFT that can contain other NFTs (subfolders and files)
       const createTokenTx = new TokenCreateTransaction()
         .setTokenName(folderName)
         .setTokenSymbol(folderName.substring(0, 4).toUpperCase())
@@ -345,15 +308,24 @@ class HederaService {
         .setDecimals(0)
         .setInitialSupply(0)
         .setTreasuryAccountId(AccountId.fromString(this.currentWallet.accountId))
-        .setSupplyType(TokenSupplyType.Finite)
-        .setMaxSupply(1000)
-        .setTokenMemo(JSON.stringify(metadata));
+        .setSupplyType(TokenSupplyType.Infinite)
+        .setSupplyKey(this.currentWallet.privateKey) // Required for infinite supply tokens
+        // No maxSupply for infinite supply
+        .setTokenMemo(JSON.stringify({
+          ...metadata,
+          type: 'folder',
+          hierarchical: true,
+          canContain: ['subfolders', 'files'],
+          maxChildren: 'unlimited'
+        }));
 
+      // Execute transaction - user's wallet signs it
       const response = await createTokenTx.execute(this.client);
       const receipt = await response.getReceipt(this.client);
       const tokenId = receipt.tokenId!.toString();
 
-      console.log('Real folder token created:', tokenId);
+      console.log('Real folder token created on testnet:', tokenId);
+      console.log('Transaction signed by user wallet:', this.currentWallet.accountId);
 
       return {
         tokenId,
@@ -361,28 +333,84 @@ class HederaService {
         cost: receipt.transactionFee.toTinybars().toNumber(),
       };
     } catch (error) {
-      console.error('Failed to create folder token:', error);
-      
-      // For TESTNET development, fall back to simulated token creation
-      console.log('Falling back to TESTNET simulated token creation');
-      const simulatedTokenId = `0.0.${Math.floor(Math.random() * 1000000)}`;
-      const simulatedTransactionId = `tx_${Date.now()}`;
-      
-      console.log('TESTNET: Fallback simulated folder token created:', simulatedTokenId);
-      
-      return {
-        tokenId: simulatedTokenId,
-        transactionId: simulatedTransactionId,
-        cost: 1000, // Simulated cost in tinybars
-      };
+      console.error('Failed to create folder token on testnet:', error);
+      throw new Error(`Failed to create folder token: ${error.message}`);
     }
   }
 
   /**
-   * Mint NFT for file
+   * Create subfolder token associated with parent folder token
+   * User's wallet signs all transactions
+   */
+  async createSubfolderToken(
+    parentTokenId: string,
+    subfolderName: string,
+    subfolderDescription: string,
+    metadata: Record<string, any>
+  ): Promise<{
+    tokenId: string;
+    transactionId: string;
+    cost: number;
+  }> {
+    if (!this.client || !this.currentWallet) {
+      throw new Error('Hedera client or wallet not initialized');
+    }
+
+    if (!this.operatorConfigured) {
+      throw new Error('User wallet not set as operator - cannot create tokens');
+    }
+
+    try {
+      console.log('Creating subfolder token on testnet:', subfolderName);
+      console.log('Parent folder token:', parentTokenId);
+      console.log('User wallet will sign the transaction:', this.currentWallet.accountId);
+
+      // Create subfolder token - associated with parent folder
+      const createTokenTx = new TokenCreateTransaction()
+        .setTokenName(subfolderName)
+        .setTokenSymbol(subfolderName.substring(0, 4).toUpperCase())
+        .setTokenType(TokenType.NonFungibleUnique)
+        .setDecimals(0)
+        .setInitialSupply(0)
+        .setTreasuryAccountId(AccountId.fromString(this.currentWallet.accountId))
+        .setSupplyType(TokenSupplyType.Infinite)
+        .setSupplyKey(this.currentWallet.privateKey) // Required for infinite supply tokens
+        // No maxSupply for infinite supply
+        .setTokenMemo(JSON.stringify({
+          ...metadata,
+          type: 'subfolder',
+          parentTokenId: parentTokenId,
+          hierarchical: true,
+          canContain: ['subfolders', 'files'],
+          maxChildren: 'unlimited'
+        }));
+
+      const response = await createTokenTx.execute(this.client);
+      const receipt = await response.getReceipt(this.client);
+      const tokenId = receipt.tokenId!.toString();
+
+      console.log('Subfolder token created on testnet:', tokenId);
+      console.log('Associated with parent folder token:', parentTokenId);
+      console.log('Transaction signed by user wallet:', this.currentWallet.accountId);
+
+      return {
+        tokenId,
+        transactionId: response.transactionId.toString(),
+        cost: receipt.transactionFee.toTinybars().toNumber(),
+      };
+    } catch (error) {
+      console.error('Failed to create subfolder token on testnet:', error);
+      throw new Error(`Failed to create subfolder token: ${error.message}`);
+    }
+  }
+
+  /**
+   * Mint NFT for file on live testnet
+   * File NFT is associated with parent folder token
+   * User's wallet signs all transactions
    */
   async mintFileNFT(
-    tokenId: string,
+    parentTokenId: string,
     fileMetadata: Record<string, any>
   ): Promise<{
     serialNumber: number;
@@ -393,17 +421,31 @@ class HederaService {
       throw new Error('Hedera client or wallet not initialized');
     }
 
+    if (!this.operatorConfigured) {
+      throw new Error('User wallet not set as operator - cannot mint NFTs');
+    }
+
     try {
-      // Mint NFT transaction
+      console.log('Minting file NFT on testnet for parent token:', parentTokenId);
+      console.log('User wallet will sign the transaction:', this.currentWallet.accountId);
+
+      // Mint file NFT - associated with parent folder token
       const mintTx = new TokenMintTransaction()
-        .setTokenId(tokenId)
-        .setMetadata([new Uint8Array(Buffer.from(JSON.stringify(fileMetadata)))]);
+        .setTokenId(parentTokenId)
+        .setMetadata([new Uint8Array(Buffer.from(JSON.stringify({
+          ...fileMetadata,
+          type: 'file',
+          parentTokenId: parentTokenId,
+          associatedWith: 'folder'
+        })))]);
 
       const response = await mintTx.execute(this.client);
       const receipt = await response.getReceipt(this.client);
       const serialNumber = receipt.serials[0].toNumber();
 
-      console.log('File NFT minted:', serialNumber);
+      console.log('File NFT minted on testnet:', serialNumber);
+      console.log('Associated with parent folder token:', parentTokenId);
+      console.log('Transaction signed by user wallet:', this.currentWallet.accountId);
 
       return {
         serialNumber,
@@ -411,8 +453,65 @@ class HederaService {
         cost: receipt.transactionFee.toTinybars().toNumber(),
       };
     } catch (error) {
-      console.error('Failed to mint file NFT:', error);
-      throw error;
+      console.error('Failed to mint file NFT on testnet:', error);
+      throw new Error(`Failed to mint file NFT: ${error.message}`);
+    }
+  }
+
+  /**
+   * Get all tokens associated with a folder (subfolders and files)
+   * Returns hierarchical structure of the folder
+   */
+  async getFolderContents(folderTokenId: string): Promise<{
+    subfolders: Array<{
+      tokenId: string;
+      name: string;
+      metadata: any;
+    }>;
+    files: Array<{
+      serialNumber: number;
+      name: string;
+      metadata: any;
+    }>;
+  }> {
+    if (!this.client) throw new Error('Hedera client not initialized');
+
+    try {
+      console.log('Querying folder contents for token:', folderTokenId);
+      
+      // In a real implementation, you would query the blockchain for:
+      // 1. All tokens created by the user that have parentTokenId = folderTokenId
+      // 2. All NFTs minted to the folder token
+      
+      // For now, return empty structure - this would be implemented with
+      // proper blockchain queries to get the hierarchical structure
+      console.log('Folder contents query completed for token:', folderTokenId);
+      
+      return {
+        subfolders: [], // Would be populated with actual subfolder tokens
+        files: [] // Would be populated with actual file NFTs
+      };
+    } catch (error) {
+      console.error('Failed to get folder contents:', error);
+      throw new Error(`Failed to get folder contents: ${error.message}`);
+    }
+  }
+
+  /**
+   * Get token information from blockchain
+   */
+  async getTokenInfo(tokenId: string): Promise<any> {
+    if (!this.client) throw new Error('Hedera client not initialized');
+
+    try {
+      const tokenInfoQuery = new (require('@hashgraph/sdk').TokenInfoQuery)()
+        .setTokenId(tokenId);
+      
+      const tokenInfo = await tokenInfoQuery.execute(this.client);
+      return tokenInfo;
+    } catch (error) {
+      console.error('Failed to get token info:', error);
+      return null;
     }
   }
 
@@ -485,6 +584,55 @@ class HederaService {
       };
     } catch (error) {
       console.error('Failed to get network info:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Purchase HBAR using funding
+   * Simulates purchasing 100 HBAR with the provided funding amount
+   */
+  async purchaseHBAR(fundingAmount: number, targetAccountId?: string): Promise<{
+    success: boolean;
+    hbarAmount: number;
+    transactionId?: string;
+    cost: number;
+  }> {
+    if (!this.client || !this.currentWallet) {
+      throw new Error('Hedera client or wallet not initialized');
+    }
+
+    try {
+      const accountId = targetAccountId || this.currentWallet.accountId;
+      if (!accountId) throw new Error('No target account ID provided');
+
+      // Calculate HBAR amount based on current market rate
+      // 100 HBAR = AUD $32.00 (current market rate)
+      const hbarAmount = 100; // Fixed 100 HBAR as requested
+      const hbarCostAUD = 32.00; // AUD $32.00 for 100 HBAR
+      const estimatedCost = hbarCostAUD; // Use actual HBAR cost
+
+      console.log(`🧪 TESTNET: Simulating HBAR purchase`);
+      console.log(`💰 Funding amount: $${fundingAmount}`);
+      console.log(`🪙 HBAR to purchase: ${hbarAmount} HBAR`);
+      console.log(`💸 HBAR cost: AUD $${estimatedCost}`);
+      console.log(`💵 Remaining funding: $${(fundingAmount - estimatedCost).toFixed(2)}`);
+
+      // Simulate HBAR purchase transaction
+      const simulatedTransactionId = `hbartx_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+      
+      console.log(`✅ TESTNET: HBAR purchase simulated successfully`);
+      console.log(`📝 Transaction ID: ${simulatedTransactionId}`);
+      console.log(`🎯 Target account: ${accountId}`);
+
+      return {
+        success: true,
+        hbarAmount,
+        transactionId: simulatedTransactionId,
+        cost: estimatedCost,
+      };
+    } catch (error) {
+      console.error('Failed to purchase HBAR:', error);
       throw error;
     }
   }

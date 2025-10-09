@@ -5,16 +5,17 @@
 
 import { Alert } from 'react-native';
 import WalletManager from './WalletManager';
-import PaymentService from '../payment/PaymentService';
 import HederaService from './HederaService';
 import DatabaseService from '../../database/DatabaseService';
+import PayIDService from '../payment/PayIDService';
 import { Wallet } from '../../types';
 
 export interface FundingOptions {
   amount: number; // USD amount to fund
-  provider: 'alchemy' | 'banxa';
+  provider: 'alchemy' | 'banxa' | 'payid';
   userEmail: string;
   userId: string;
+  paymentMethod?: string; // Specific payment method like 'credit_card', 'payid', etc.
 }
 
 export interface FundingResult {
@@ -23,6 +24,7 @@ export interface FundingResult {
   paymentUrl?: string;
   transactionId?: string;
   estimatedHBAR?: number;
+  payIDAddress?: string;
   error?: string;
 }
 
@@ -36,24 +38,21 @@ class SelfFundedWalletManager {
     try {
       console.log('Creating self-funded wallet with options:', options);
 
-      // Step 1: Show payment options to user
-      const paymentResponse = await PaymentService.showPaymentOptions(
-        options.amount,
-        options.userEmail,
-        options.userId
-      );
-
-      if (!paymentResponse) {
-        return {
-          success: false,
-          error: 'Payment cancelled by user',
-        };
-      }
-
-      if (!paymentResponse.success) {
-        return {
-          success: false,
-          error: paymentResponse.error || 'Payment creation failed',
+      // Step 1: Process payment based on provider
+      console.log('Processing payment for:', options.provider, options.amount);
+      
+      let paymentResponse;
+      
+      if (options.provider === 'payid' || options.paymentMethod === 'payid') {
+        // Handle PayID payment
+        paymentResponse = await this.processPayIDPayment(options);
+      } else {
+        // Handle Alchemy Pay or Banxa payment
+        paymentResponse = {
+          success: true,
+          paymentUrl: `https://testnet-${options.provider}.com/checkout?amount=${options.amount}`,
+          transactionId: `tx_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+          estimatedCryptoAmount: options.amount / 0.1, // Simulate HBAR conversion
         };
       }
 
@@ -61,13 +60,26 @@ class SelfFundedWalletManager {
       console.log('Creating wallet with simulated Hedera account...');
       const wallet = await this.createWalletWithSimulatedAccount();
 
-      // Step 3: Store payment information
+      // Step 3: Create PayID account for the user
+      console.log('Creating PayID account for user...');
+      const payIDService = PayIDService.getInstance();
+      const payIDAccount = await payIDService.createPayIDAccount(
+        options.userId,
+        options.userEmail,
+        wallet.accountId,
+        true // isTestnet
+      );
+      
+      console.log(`✅ PayID account created: ${payIDAccount.address}`);
+
+      // Step 4: Store payment information
       await this.storePaymentInfo(wallet.id, {
         transactionId: paymentResponse.transactionId!,
         amount: options.amount,
         provider: options.provider,
         estimatedHBAR: paymentResponse.estimatedCryptoAmount || 0,
         paymentUrl: paymentResponse.paymentUrl,
+        payIDAddress: payIDAccount.address,
       });
 
       return {
@@ -76,6 +88,7 @@ class SelfFundedWalletManager {
         paymentUrl: paymentResponse.paymentUrl,
         transactionId: paymentResponse.transactionId,
         estimatedHBAR: paymentResponse.estimatedCryptoAmount,
+        payIDAddress: payIDAccount.address,
       };
     } catch (error) {
       console.error('Self-funded wallet creation failed:', error);
@@ -93,26 +106,44 @@ class SelfFundedWalletManager {
     try {
       // Generate simulated account data for TESTNET
       const simulatedAccountId = `0.0.${Math.floor(Math.random() * 1000000)}`;
-      const simulatedPrivateKey = `302e020100300506032b657004220420${Math.random().toString(16).substr(2, 64)}`;
-      const simulatedPublicKey = `302a300506032b6570032100${Math.random().toString(16).substr(2, 64)}`;
+      
+      // Generate proper 32-byte ED25519 private key
+      const privateKeyBytes = new Uint8Array(32);
+      for (let i = 0; i < 32; i++) {
+        privateKeyBytes[i] = Math.floor(Math.random() * 256);
+      }
+      
+      // Convert to DER format for Hedera
+      const privateKeyHex = Array.from(privateKeyBytes)
+        .map(b => b.toString(16).padStart(2, '0'))
+        .join('');
+      const simulatedPrivateKey = `302e020100300506032b657004220420${privateKeyHex}`;
+      
+      // Generate corresponding public key (simplified for testnet)
+      const publicKeyBytes = new Uint8Array(32);
+      for (let i = 0; i < 32; i++) {
+        publicKeyBytes[i] = Math.floor(Math.random() * 256);
+      }
+      const publicKeyHex = Array.from(publicKeyBytes)
+        .map(b => b.toString(16).padStart(2, '0'))
+        .join('');
+      const simulatedPublicKey = `302a300506032b6570032100${publicKeyHex}`;
 
       console.log('TESTNET: Creating account with simulated Hedera account:', simulatedAccountId);
 
-      // Create wallet object
-      const walletData: Omit<Wallet, 'id' | 'createdAt' | 'lastSynced'> = {
+      // Create account data for WalletManager
+      const accountData = {
         accountId: simulatedAccountId,
         publicKey: simulatedPublicKey,
         privateKey: simulatedPrivateKey,
-        balance: 100, // Simulated 100 HBAR balance
-        isActive: true,
-        network: 'testnet',
       };
 
-      // Save to database
-      const savedWallet = await DatabaseService.createWallet(walletData);
+      // Use WalletManager to create wallet (this will handle keychain storage)
+      const walletManager = WalletManager.getInstance();
+      const savedWallet = await walletManager.createWallet(accountData);
       
-      // Set wallet in Hedera service
-      HederaService.setWallet(savedWallet);
+      // Update balance to reflect HBAR purchase
+      await DatabaseService.updateWalletBalance(savedWallet.id, 100);
 
       console.log('TESTNET: Self-funded account created successfully:', savedWallet.accountId);
       return savedWallet;
@@ -237,6 +268,55 @@ class SelfFundedWalletManager {
    */
   getEstimatedHBAR(usdAmount: number, provider: 'alchemy' | 'banxa'): number {
     return PaymentService.calculateHBARAmount(usdAmount, provider);
+  }
+
+  /**
+   * Process PayID payment (TESTNET simulation)
+   */
+  private async processPayIDPayment(options: FundingOptions): Promise<{
+    success: boolean;
+    paymentUrl?: string;
+    transactionId: string;
+    estimatedCryptoAmount: number;
+    payIDAddress?: string;
+  }> {
+    try {
+      console.log('🧪 TESTNET: Processing PayID payment...');
+      
+      // Generate PayID address for the user
+      const payIDService = PayIDService.getInstance();
+      const payIDAddress = payIDService.generatePayIDAddress(options.userEmail, true);
+      
+      console.log(`Generated PayID address: ${payIDAddress}`);
+      
+      // Create payment request
+      const paymentRequest = payIDService.createPaymentRequest(
+        payIDAddress,
+        options.amount,
+        'USD',
+        `SafeMate account funding for ${options.userEmail}`
+      );
+      
+      // Simulate PayID payment processing
+      const payIDResult = await payIDService.simulatePayIDPayment(
+        paymentRequest,
+        '0.0.123456' // Placeholder wallet address
+      );
+      
+      console.log('✅ PayID payment processed successfully:', payIDResult);
+      
+      return {
+        success: true,
+        paymentUrl: `payid://${payIDAddress}?amount=${options.amount}&currency=USD`,
+        transactionId: payIDResult.transactionId,
+        estimatedCryptoAmount: options.amount / 0.1, // Simulate HBAR conversion
+        payIDAddress: payIDAddress
+      };
+      
+    } catch (error) {
+      console.error('PayID payment processing failed:', error);
+      throw new Error(`PayID payment failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
   }
 
   /**

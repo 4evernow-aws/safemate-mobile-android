@@ -32,10 +32,13 @@ import FileList from './src/components/FileList';
 import AccountDetails from './src/components/WalletStatus';
 import SyncStatus from './src/components/SyncStatus';
 import AuthScreen from './src/components/AuthScreen';
+import CreateFolderModal from './src/components/CreateFolderModal';
+import BlockchainStatus from './src/components/BlockchainStatus';
 
 // Services
 import DataService from './src/services/DataService';
 import BlockchainSyncService from './src/services/blockchain/BlockchainSyncService';
+import BlockchainVerificationService from './src/services/blockchain/BlockchainVerificationService';
 import WalletManager from './src/services/blockchain/WalletManager';
 
 // Types
@@ -54,6 +57,9 @@ function App() {
   const [folders, setFolders] = useState<Folder[]>([]);
   const [files, setFiles] = useState<File[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  
+  // Modal state
+  const [showCreateFolderModal, setShowCreateFolderModal] = useState(false);
 
   useEffect(() => {
     // Only initialize app after authentication
@@ -69,8 +75,11 @@ function App() {
       
       // Initialize database and load data
       await DataService.initialize();
-      const loadedFolders = await DataService.getFolders();
-      setFolders(loadedFolders);
+      
+      // Only load verified folders (authenticated on blockchain)
+      const verifiedFolders = await BlockchainVerificationService.getVerifiedFolders();
+      setFolders(verifiedFolders);
+      console.log(`Loaded ${verifiedFolders.length} verified folders from blockchain`);
       
       // Initialize blockchain services (with error handling)
       try {
@@ -208,73 +217,68 @@ function App() {
   };
 
   const handleCreateFolder = () => {
-    Alert.prompt(
-      'Create New Folder',
-      'Enter folder name:',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        { 
-          text: 'Create', 
-          onPress: async (folderName) => {
-            if (folderName && folderName.trim()) {
-              try {
-                console.log('Creating folder:', folderName.trim());
-                
-                // Create folder in database
-                const newFolder = await DataService.createFolder({
-                  name: folderName.trim(),
-                  type: 'personal', // Default type
-                  description: 'User created folder',
-                  isBlockchain: true,
-                  isEncrypted: true,
-                });
-                
-                console.log('Folder created in database:', newFolder.id);
-                
-                // Sync folder to blockchain to create NFT
-                if (walletConnected && newFolder.isBlockchain) {
-                  console.log('Syncing folder to blockchain...');
-                  try {
-                    const syncResult = await BlockchainSyncService.syncFolderToBlockchain(newFolder.id);
-                    if (syncResult.success) {
-                      console.log('Folder synced to blockchain successfully:', syncResult.blockchainTokenId);
-                      Alert.alert(
-                        'Success! 🎉', 
-                        `Folder "${folderName.trim()}" created successfully!\n\nBlockchain NFT: ${syncResult.blockchainTokenId}`
-                      );
-                    } else {
-                      console.warn('Blockchain sync failed:', syncResult.error);
-                      Alert.alert(
-                        'Folder Created (Offline)', 
-                        `Folder "${folderName.trim()}" created locally. It will sync to blockchain when online.`
-                      );
-                    }
-                  } catch (syncError) {
-                    console.error('Blockchain sync error:', syncError);
-                    Alert.alert(
-                      'Folder Created (Offline)', 
-                      `Folder "${folderName.trim()}" created locally. It will sync to blockchain when online.`
-                    );
-                  }
-                } else {
-                  console.log('Wallet not connected or folder not set for blockchain');
-                  Alert.alert('Success', `Folder "${folderName.trim()}" created successfully!`);
-                }
-                
-                // Refresh folders list
-                const updatedFolders = await DataService.getFolders();
-                setFolders(updatedFolders);
-                
-              } catch (error) {
-                console.error('Failed to create folder:', error);
-                Alert.alert('Error', 'Failed to create folder');
-              }
-            }
+    setShowCreateFolderModal(true);
+  };
+
+  const handleCreateFolderSubmit = async (folderData: {
+    name: string;
+    type: 'parent' | 'subfolder';
+    parentId?: string;
+    description?: string;
+  }) => {
+    try {
+      console.log('Creating folder:', folderData);
+      
+      // Create folder in database
+      const newFolder = await DataService.createFolder({
+        name: folderData.name,
+        type: 'personal', // All folders use 'personal' type for database constraint
+        description: folderData.description || 'User created folder',
+        isBlockchain: true,
+        isEncrypted: true,
+        parentId: folderData.parentId,
+      });
+      
+      console.log('Folder created in database:', newFolder.id);
+      
+      // Sync folder to blockchain to create NFT
+      if (walletConnected && newFolder.isBlockchain) {
+        console.log('Syncing folder to blockchain...');
+        try {
+          const syncResult = await BlockchainSyncService.syncFolderToBlockchain(newFolder.id);
+          if (syncResult.success) {
+            console.log('Folder synced to blockchain successfully:', syncResult.blockchainTokenId);
+            Alert.alert(
+              'Success! 🎉', 
+              `${folderData.type === 'parent' ? 'Parent folder' : 'Subfolder'} "${folderData.name}" created successfully!\n\nBlockchain NFT: ${syncResult.blockchainTokenId}`
+            );
+          } else {
+            console.warn('Blockchain sync failed:', syncResult.error);
+            Alert.alert(
+              'Folder Created (Offline)', 
+              `${folderData.type === 'parent' ? 'Parent folder' : 'Subfolder'} "${folderData.name}" created locally. It will sync to blockchain when online.`
+            );
           }
-        },
-      ],
-      'plain-text'
-    );
+        } catch (syncError) {
+          console.error('Blockchain sync error:', syncError);
+          Alert.alert(
+            'Folder Created (Offline)', 
+            `${folderData.type === 'parent' ? 'Parent folder' : 'Subfolder'} "${folderData.name}" created locally. It will sync to blockchain when online.`
+          );
+        }
+      } else {
+        console.log('Wallet not connected or folder not set for blockchain');
+        Alert.alert('Success', `${folderData.type === 'parent' ? 'Parent folder' : 'Subfolder'} "${folderData.name}" created successfully!`);
+      }
+      
+          // Refresh verified folders list (only show blockchain-verified folders)
+          const verifiedFolders = await BlockchainVerificationService.getVerifiedFolders();
+          setFolders(verifiedFolders);
+      
+    } catch (error) {
+      console.error('Failed to create folder:', error);
+      Alert.alert('Error', 'Failed to create folder');
+    }
   };
 
   const handleUploadFile = () => {
@@ -286,6 +290,17 @@ function App() {
         { text: 'Choose File', onPress: () => console.log('Opening file picker...') },
       ]
     );
+  };
+
+  const handleRefresh = async () => {
+    try {
+      // Refresh verified folders (only show blockchain-verified folders)
+      const verifiedFolders = await BlockchainVerificationService.getVerifiedFolders();
+      setFolders(verifiedFolders);
+      console.log(`Refreshed: ${verifiedFolders.length} verified folders`);
+    } catch (error) {
+      console.error('Failed to refresh verified folders:', error);
+    }
   };
 
   const renderHomeView = () => {
@@ -306,6 +321,9 @@ function App() {
           userData={userData}
         />
         <SyncStatus status={syncStatus} />
+        <BlockchainStatus 
+          onRefresh={handleRefresh}
+        />
         
         <View style={styles.section}>
           <Text style={[styles.sectionTitle, isDarkMode && styles.darkText]}>
@@ -333,25 +351,6 @@ function App() {
                   </TouchableOpacity>
                 </View>
 
-                <View style={styles.logoutSection}>
-                  <TouchableOpacity
-                    style={[styles.logoutButton, isDarkMode && styles.darkLogoutButton]}
-                    onPress={() => {
-                      Alert.alert(
-                        'Sign Out',
-                        'Are you sure you want to sign out?',
-                        [
-                          { text: 'Cancel', style: 'cancel' },
-                          { text: 'Sign Out', onPress: resetApp, style: 'destructive' }
-                        ]
-                      );
-                    }}
-                  >
-                    <Text style={[styles.logoutButtonText, isDarkMode && styles.darkLogoutButtonText]}>
-                      Sign Out
-                    </Text>
-                  </TouchableOpacity>
-                </View>
       </ScrollView>
     );
   };
@@ -392,30 +391,20 @@ function App() {
         <Header 
           title="SafeMate"
           subtitle="Keeping your data and legacy safe"
-          onMenuPress={() => {
-            Alert.alert(
-              'Account Options',
-              'What would you like to do?',
-              [
-                { text: 'Cancel', style: 'cancel' },
-                { text: 'Sign Out', onPress: resetApp },
-                { text: 'Delete Account', onPress: () => {
-                  Alert.alert(
-                    'Delete Account',
-                    'This will permanently delete your account and all data. This action cannot be undone.',
-                    [
-                      { text: 'Cancel', style: 'cancel' },
-                      { text: 'Delete', onPress: deleteUserAccount, style: 'destructive' }
-                    ]
-                  );
-                }, style: 'destructive' }
-              ]
-            );
-          }}
+          onSignOut={resetApp}
+          onDeleteAccount={deleteUserAccount}
         />
         
         {currentView === 'home' && renderHomeView()}
         {currentView === 'folder' && renderFolderView()}
+        
+        {/* Create Folder Modal */}
+        <CreateFolderModal
+          visible={showCreateFolderModal}
+          onClose={() => setShowCreateFolderModal(false)}
+          onCreateFolder={handleCreateFolderSubmit}
+          parentFolders={folders.filter(f => f.type === 'personal')}
+        />
       </SafeAreaView>
     </SafeAreaProvider>
   );
@@ -497,29 +486,6 @@ const styles = StyleSheet.create({
     fontSize: 18,
     color: '#2c3e50',
     textAlign: 'center',
-  },
-  logoutSection: {
-    marginTop: 32,
-    paddingTop: 16,
-    borderTopWidth: 1,
-    borderTopColor: '#ecf0f1',
-  },
-  logoutButton: {
-    backgroundColor: '#e74c3c',
-    padding: 12,
-    borderRadius: 8,
-    alignItems: 'center',
-  },
-  darkLogoutButton: {
-    backgroundColor: '#c0392b',
-  },
-  logoutButtonText: {
-    color: '#ffffff',
-    fontSize: 16,
-    fontWeight: 'bold',
-  },
-  darkLogoutButtonText: {
-    color: '#ffffff',
   },
 });
 

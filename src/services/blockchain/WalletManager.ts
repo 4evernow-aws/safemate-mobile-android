@@ -16,6 +16,7 @@ import { Wallet } from '../../types';
 class WalletManager {
   private readonly KEYCHAIN_SERVICE = 'SafeMateWallet';
   private readonly ENCRYPTION_KEY = 'SafeMateEncryption2024';
+  private currentWallet: Wallet | null = null;
 
   /**
    * Create a new wallet
@@ -62,12 +63,18 @@ class WalletManager {
    */
   async loadWallet(walletId: string): Promise<Wallet | null> {
     try {
+      console.log(`🔍 Loading wallet with ID: ${walletId}`);
       const wallet = await DatabaseService.getWalletById(walletId);
-      if (!wallet) return null;
+      if (!wallet) {
+        console.log(`❌ Wallet not found in database: ${walletId}`);
+        return null;
+      }
 
+      console.log(`✅ Wallet found in database: ${wallet.accountId}`);
       // Decrypt private key from keychain
       const decryptedPrivateKey = await this.getPrivateKeyFromKeychain(walletId);
       if (!decryptedPrivateKey) {
+        console.log(`❌ Failed to retrieve private key from keychain for wallet: ${walletId}`);
         throw new Error('Failed to retrieve private key from keychain');
       }
 
@@ -96,8 +103,18 @@ class WalletManager {
       if (!wallet) throw new Error('Wallet not found');
 
       // Load wallet if not already loaded
-      if (!HederaService.currentWallet) {
+      if (!this.currentWallet) {
         await this.loadWallet(walletId);
+      }
+
+      // Initialize Hedera client if not already initialized
+      if (!HederaService.isInitialized()) {
+        await HederaService.initializeTestnet();
+      }
+
+      // Set the wallet as operator before getting balance
+      if (this.currentWallet) {
+        HederaService.setWallet(this.currentWallet);
       }
 
       const balance = await HederaService.getBalance();
@@ -120,8 +137,11 @@ class WalletManager {
    */
   async hasWallet(): Promise<boolean> {
     try {
+      console.log('Checking for existing wallet...');
       const wallets = await DatabaseService.getWallets();
-      return wallets.length > 0;
+      const hasWallet = wallets.length > 0;
+      console.log(`Wallet check result: ${hasWallet ? 'Found' : 'No wallet found'}`);
+      return hasWallet;
     } catch (error) {
       console.error('Failed to check wallet existence:', error);
       return false;
@@ -148,6 +168,13 @@ class WalletManager {
   }
 
   /**
+   * Get current loaded wallet
+   */
+  getCurrentWallet(): Wallet | null {
+    return this.currentWallet;
+  }
+
+  /**
    * Update wallet balance
    */
   async updateWalletBalance(walletId: string): Promise<void> {
@@ -165,7 +192,31 @@ class WalletManager {
    */
   async checkNetworkConnectivity(): Promise<boolean> {
     try {
-      return await HederaService.checkConnectivity();
+      console.log('Checking Hedera testnet connectivity...');
+      
+      // Initialize Hedera client
+      await HederaService.initializeTestnet();
+      
+      // Try to get network info (simple connectivity test)
+      const client = HederaService.getClient();
+      if (!client) {
+        console.log('Hedera client not available');
+        return false;
+      }
+
+      // Test connectivity by trying to get account info for a known testnet account
+      try {
+        const testAccountId = '0.0.2'; // Known testnet account
+        const balanceQuery = new (require('@hashgraph/sdk').AccountBalanceQuery)()
+          .setAccountId(testAccountId);
+        
+        await balanceQuery.execute(client);
+        console.log('Hedera testnet connectivity: SUCCESS');
+        return true;
+      } catch (networkError: any) {
+        console.log('Hedera testnet connectivity: FAILED -', networkError.message);
+        return false;
+      }
     } catch (error) {
       console.error('Network connectivity check failed:', error);
       return false;
@@ -221,17 +272,23 @@ class WalletManager {
    */
   private async storePrivateKeyInKeychain(walletId: string, encryptedPrivateKey: string): Promise<void> {
     try {
+      const keychainService = `${this.KEYCHAIN_SERVICE}_${walletId}`;
+      console.log(`🔐 Storing private key in keychain for service: ${keychainService}`);
+      
       await Keychain.setInternetCredentials(
-        `${this.KEYCHAIN_SERVICE}_${walletId}`,
+        keychainService,
         walletId,
         encryptedPrivateKey,
         {
           accessControl: Keychain.ACCESS_CONTROL.BIOMETRY_ANY,
-          authenticationType: Keychain.AUTHENTICATION_TYPE.DEVICE_PASSCODE_OR_BIOMETRICS,
         }
       );
+      
+      console.log(`✅ Private key stored successfully in keychain for wallet: ${walletId}`);
     } catch (error) {
       console.error('Failed to store private key in keychain:', error);
+      console.error('Wallet ID:', walletId);
+      console.error('Keychain service:', `${this.KEYCHAIN_SERVICE}_${walletId}`);
       throw error;
     }
   }
@@ -241,17 +298,22 @@ class WalletManager {
    */
   private async getPrivateKeyFromKeychain(walletId: string): Promise<string | null> {
     try {
-      const credentials = await Keychain.getInternetCredentials(
-        `${this.KEYCHAIN_SERVICE}_${walletId}`
-      );
+      const keychainService = `${this.KEYCHAIN_SERVICE}_${walletId}`;
+      console.log(`🔑 Attempting to retrieve keychain for service: ${keychainService}`);
+      
+      const credentials = await Keychain.getInternetCredentials(keychainService);
       
       if (credentials) {
+        console.log(`✅ Keychain credentials found for wallet: ${walletId}`);
         return credentials.password;
       }
       
+      console.log(`❌ No keychain credentials found for wallet: ${walletId}`);
       return null;
     } catch (error) {
       console.error('Failed to get private key from keychain:', error);
+      console.error('Wallet ID:', walletId);
+      console.error('Keychain service:', `${this.KEYCHAIN_SERVICE}_${walletId}`);
       return null;
     }
   }
@@ -261,64 +323,16 @@ class WalletManager {
    */
   async deleteWalletFromKeychain(walletId: string): Promise<void> {
     try {
-      await Keychain.resetInternetCredentials(`${this.KEYCHAIN_SERVICE}_${walletId}`);
+      await Keychain.resetInternetCredentials({
+        service: `${this.KEYCHAIN_SERVICE}_${walletId}`,
+        username: walletId
+      });
     } catch (error) {
       console.error('Failed to delete wallet from keychain:', error);
       throw error;
     }
   }
 
-  /**
-   * Check if user has an existing wallet
-   */
-  async hasWallet(): Promise<boolean> {
-    try {
-      console.log('Checking for existing wallet...');
-      const wallets = await DatabaseService.getWallets();
-      const hasWallet = wallets.length > 0;
-      console.log(`Wallet check result: ${hasWallet ? 'Found' : 'No wallet found'}`);
-      return hasWallet;
-    } catch (error) {
-      console.error('Failed to check for existing wallet:', error);
-      return false;
-    }
-  }
-
-  /**
-   * Check network connectivity to Hedera testnet
-   */
-  async checkNetworkConnectivity(): Promise<boolean> {
-    try {
-      console.log('Checking Hedera testnet connectivity...');
-      
-      // Initialize Hedera client
-      await HederaService.initializeTestnet();
-      
-      // Try to get network info (simple connectivity test)
-      const client = HederaService.getClient();
-      if (!client) {
-        console.log('Hedera client not available');
-        return false;
-      }
-
-      // Test connectivity by trying to get account info for a known testnet account
-      try {
-        const testAccountId = '0.0.2'; // Known testnet account
-        const balanceQuery = new (require('@hashgraph/sdk').AccountBalanceQuery)()
-          .setAccountId(testAccountId);
-        
-        await balanceQuery.execute(client);
-        console.log('Hedera testnet connectivity: SUCCESS');
-        return true;
-      } catch (networkError) {
-        console.log('Hedera testnet connectivity: FAILED -', networkError.message);
-        return false;
-      }
-    } catch (error) {
-      console.error('Network connectivity check failed:', error);
-      return false;
-    }
-  }
 
   /**
    * Test crypto functionality before wallet creation
@@ -345,8 +359,12 @@ class WalletManager {
       };
       
       console.log('Crypto test results:', testResults);
-      return testResults;
-    } catch (error) {
+      return {
+        cryptoWorking,
+        availableMethods,
+        testResults
+      };
+    } catch (error: any) {
       console.error('Crypto functionality test failed:', error);
       return {
         cryptoWorking: false,

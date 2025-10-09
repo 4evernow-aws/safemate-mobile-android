@@ -9,6 +9,7 @@ export interface PaymentProvider {
   name: string;
   id: string;
   supportedCurrencies: string[];
+  supportedPaymentMethods: string[];
   minAmount: number;
   maxAmount: number;
   fees: {
@@ -73,6 +74,14 @@ class PaymentService {
         name: 'Alchemy Pay',
         id: 'alchemy',
         supportedCurrencies: ['USD', 'EUR', 'GBP', 'CAD', 'AUD'],
+        supportedPaymentMethods: [
+          'Credit/Debit Cards',
+          'Bank Transfer',
+          'PayID',
+          'Apple Pay',
+          'Google Pay',
+          'Cryptocurrency'
+        ],
         minAmount: 10,
         maxAmount: 10000,
         fees: {
@@ -84,6 +93,15 @@ class PaymentService {
         name: 'Banxa',
         id: 'banxa',
         supportedCurrencies: ['USD', 'EUR', 'GBP', 'CAD', 'AUD', 'JPY'],
+        supportedPaymentMethods: [
+          'Credit/Debit Cards',
+          'Bank Transfer',
+          'PayID',
+          'Apple Pay',
+          'Google Pay',
+          'Cryptocurrency',
+          'Buy Now Pay Later'
+        ],
         minAmount: 20,
         maxAmount: 50000,
         fees: {
@@ -256,9 +274,14 @@ class PaymentService {
         style: 'cancel' as const,
       });
 
+      // Create detailed message showing supported payment methods
+      const supportedMethods = providers.map(provider => 
+        `\n${provider.name}:\n• ${provider.supportedPaymentMethods.join('\n• ')}`
+      ).join('\n\n');
+
       Alert.alert(
-        'Choose Payment Method',
-        `Fund your account with $${amount} to get started with Hedera blockchain.`,
+        'Funding Your Account',
+        `Fund your account with $${amount} to get started with Hedera blockchain.\n\nSupported payment methods:${supportedMethods}`,
         options
       );
     });
