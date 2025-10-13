@@ -26,8 +26,8 @@ import {
 } from 'react-native-safe-area-context';
 
 // SafeMate Components
-import Header from './src/components/Header';
-import FolderGrid from './src/components/FolderGrid';
+import EnhancedHeader from './src/components/EnhancedHeader';
+import EnhancedFolderGrid from './src/components/EnhancedFolderGrid';
 import FileList from './src/components/FileList';
 import AccountDetails from './src/components/WalletStatus';
 import SyncStatus from './src/components/SyncStatus';
@@ -311,7 +311,7 @@ function App() {
           <Text style={[styles.sectionTitle, isDarkMode && styles.darkText]}>
             Your Folders ({folders.length})
           </Text>
-          <FolderGrid 
+          <EnhancedFolderGrid 
             folders={folders}
             onFolderPress={handleFolderPress}
           />
@@ -389,7 +389,7 @@ function App() {
     <SafeAreaProvider>
       <StatusBar barStyle={isDarkMode ? 'light-content' : 'dark-content'} />
       <SafeAreaView style={[styles.container, isDarkMode && styles.darkContainer]}>
-        <Header 
+        <EnhancedHeader 
           title="SafeMate"
           subtitle="Keeping your data and legacy safe"
           onMenuPress={() => {

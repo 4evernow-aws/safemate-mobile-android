@@ -8,16 +8,8 @@
   "react-native-tools.androidProjectPath": "./android",
   "editor.formatOnSave": true,
   "editor.codeActionsOnSave": {
-    "source.fixAll.eslint": "explicit"
+    "source.fixAll.eslint": true
   },
-  "files.exclude": {
-    "**/node_modules": true,
-    "**/android/app/build": true,
-    "**/ios/build": true
-  },
-  "search.exclude": {
-    "**/node_modules": true,
-    "**/android/app/build": true,
-    "**/ios/build": true
-  }
+  "eslint.workingDirectories": ["."],
+  "typescript.preferences.includePackageJsonAutoImports": "auto"
 }
