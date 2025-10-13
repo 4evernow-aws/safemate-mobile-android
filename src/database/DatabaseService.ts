@@ -3,7 +3,7 @@
  * SQLite database management for local-first storage
  */
 
-import SQLite from 'react-native-sqlite-storage';
+import SQLite from 'react-native-sqlite-2';
 import { 
   Folder, 
   File, 
@@ -13,20 +13,16 @@ import {
   BlockchainTransaction 
 } from '../types';
 
-// Enable promise-based API
-SQLite.enablePromise(true);
-
 class DatabaseService {
   private db: SQLite.SQLiteDatabase | null = null;
   private readonly DB_NAME = 'SafeMate.db';
-  private readonly DB_VERSION = 1;
 
   /**
    * Initialize the database
    */
   async initialize(): Promise<void> {
     try {
-      this.db = await SQLite.openDatabase({
+      this.db = SQLite.openDatabase({
         name: this.DB_NAME,
         location: 'default',
       });
@@ -76,7 +72,11 @@ class DatabaseService {
         walletId TEXT
       )
     `;
-    await this.db!.executeSql(query);
+    return new Promise((resolve, reject) => {
+      this.db!.transaction((tx) => {
+        tx.executeSql(query, [], () => resolve(), (_, error) => reject(error));
+      });
+    });
   }
 
   /**
@@ -100,7 +100,11 @@ class DatabaseService {
         FOREIGN KEY (parentFolderId) REFERENCES folders (id)
       )
     `;
-    await this.db!.executeSql(query);
+    return new Promise((resolve, reject) => {
+      this.db!.transaction((tx) => {
+        tx.executeSql(query, [], () => resolve(), (_, error) => reject(error));
+      });
+    });
   }
 
   /**
@@ -130,7 +134,11 @@ class DatabaseService {
         FOREIGN KEY (folderId) REFERENCES folders (id)
       )
     `;
-    await this.db!.executeSql(query);
+    return new Promise((resolve, reject) => {
+      this.db!.transaction((tx) => {
+        tx.executeSql(query, [], () => resolve(), (_, error) => reject(error));
+      });
+    });
   }
 
   /**
@@ -150,7 +158,11 @@ class DatabaseService {
         network TEXT NOT NULL CHECK (network IN ('testnet', 'mainnet'))
       )
     `;
-    await this.db!.executeSql(query);
+    return new Promise((resolve, reject) => {
+      this.db!.transaction((tx) => {
+        tx.executeSql(query, [], () => resolve(), (_, error) => reject(error));
+      });
+    });
   }
 
   /**
@@ -169,7 +181,11 @@ class DatabaseService {
         errorMessage TEXT
       )
     `;
-    await this.db!.executeSql(query);
+    return new Promise((resolve, reject) => {
+      this.db!.transaction((tx) => {
+        tx.executeSql(query, [], () => resolve(), (_, error) => reject(error));
+      });
+    });
   }
 
   /**
@@ -190,7 +206,11 @@ class DatabaseService {
         compressionEnabled BOOLEAN DEFAULT 1
       )
     `;
-    await this.db!.executeSql(query);
+    return new Promise((resolve, reject) => {
+      this.db!.transaction((tx) => {
+        tx.executeSql(query, [], () => resolve(), (_, error) => reject(error));
+      });
+    });
   }
 
   /**
@@ -212,7 +232,11 @@ class DatabaseService {
         errorMessage TEXT
       )
     `;
-    await this.db!.executeSql(query);
+    return new Promise((resolve, reject) => {
+      this.db!.transaction((tx) => {
+        tx.executeSql(query, [], () => resolve(), (_, error) => reject(error));
+      });
+    });
   }
 
   // Folder Operations
