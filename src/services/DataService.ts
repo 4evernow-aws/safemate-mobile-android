@@ -321,6 +321,27 @@ class DataService {
       exportDate: new Date(),
     };
   }
+
+  // User Management
+  async hasUser(): Promise<boolean> {
+    await this.ensureInitialized();
+    return await DatabaseService.hasUser();
+  }
+
+  async getUserByEmail(email: string) {
+    await this.ensureInitialized();
+    return await DatabaseService.getUserByEmail(email);
+  }
+
+  async createUser(userData: {
+    firstName: string;
+    lastName: string;
+    email: string;
+    passwordHash: string;
+  }) {
+    await this.ensureInitialized();
+    return await DatabaseService.createUser(userData);
+  }
 }
 
 export default new DataService();

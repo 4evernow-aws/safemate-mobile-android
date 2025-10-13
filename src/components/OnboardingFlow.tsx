@@ -53,14 +53,14 @@ const OnboardingFlow: React.FC<OnboardingFlowProps> = ({ onComplete, onCancel })
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   
   // Step 1: Payment Options
-  const [selectedPaymentProvider, setSelectedPaymentProvider] = useState<string | null>(null);
-  const [fundingAmount, setFundingAmount] = useState(10);
+  const [selectedPaymentProvider, setSelectedPaymentProvider] = useState<'Alchemy Pay' | 'Banxa'>('Alchemy Pay');
+  const [fundingAmount] = useState(10);
   
   // Step 2: Funding Process
   const [paymentStatus, setPaymentStatus] = useState<'pending' | 'processing' | 'completed' | 'failed'>('pending');
   
   // Step 3: Wallet Creation
-  const [walletCreationStatus, setWalletCreationStatus] = useState<'pending' | 'creating' | 'completed' | 'failed'>('pending');
+  const [_walletCreationStatus, setWalletCreationStatus] = useState<'pending' | 'creating' | 'completed' | 'failed'>('pending');
 
   // Password strength calculation
   const getPasswordStrength = (pwd: string) => {
@@ -215,59 +215,67 @@ const OnboardingFlow: React.FC<OnboardingFlowProps> = ({ onComplete, onCancel })
   );
 
   // Step 1: Payment Options
-  const renderPaymentOptionsStep = () => (
-    <View style={styles.stepContainer}>
-      <Text style={[styles.stepTitle, isDarkMode && styles.darkText]}>
-        Choose Payment Method
-      </Text>
-      <Text style={[styles.stepSubtitle, isDarkMode && styles.darkSubtext]}>
-        Step 2: Fund your account with ${fundingAmount}
-      </Text>
-      
-      <View style={styles.paymentOptionsContainer}>
-        <TouchableOpacity
-          style={[styles.paymentOption, isDarkMode && styles.darkPaymentOption]}
-          onPress={() => handlePaymentSelection('Alchemy Pay')}
-        >
-          <View style={styles.paymentOptionHeader}>
-            <Text style={[styles.paymentProviderName, isDarkMode && styles.darkText]}>
-              Alchemy Pay
-            </Text>
-            <Text style={styles.paymentFee}>Fee: 2.5%</Text>
-          </View>
+  const renderPaymentOptionsStep = () => {
+    const provider = selectedPaymentProvider === 'Alchemy Pay' ? 'alchemy' : 'banxa';
+    const feePct = selectedPaymentProvider === 'Alchemy Pay' ? 0.025 : 0.03;
+    const total = (fundingAmount * (1 + feePct)).toFixed(2);
+    const estHBAR = PaymentService.calculateHBARAmount(fundingAmount, provider as 'alchemy' | 'banxa');
+
+    return (
+      <View style={styles.stepContainer}>
+        <Text style={[styles.stepTitle, isDarkMode && styles.darkText]}>
+          Choose Payment Method
+        </Text>
+        <Text style={[styles.stepSubtitle, isDarkMode && styles.darkSubtext]}>
+          Step 2: Fund your account
+        </Text>
+
+        {/* Tabs */}
+        <View style={[styles.tabRow, isDarkMode && styles.darkTabRow]}>
+          <TouchableOpacity
+            style={[styles.tabButton, selectedPaymentProvider === 'Alchemy Pay' && styles.activeTabButton]}
+            onPress={() => setSelectedPaymentProvider('Alchemy Pay')}
+          >
+            <Text style={[styles.tabText, selectedPaymentProvider === 'Alchemy Pay' && styles.activeTabText]}>Alchemy Pay</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.tabButton, selectedPaymentProvider === 'Banxa' && styles.activeTabButton]}
+            onPress={() => setSelectedPaymentProvider('Banxa')}
+          >
+            <Text style={[styles.tabText, selectedPaymentProvider === 'Banxa' && styles.activeTabText]}>Banxa</Text>
+          </TouchableOpacity>
+        </View>
+
+        {/* Details */}
+        <View style={[styles.tabPanel, isDarkMode && styles.darkPaymentOption]}>
           <Text style={[styles.paymentDescription, isDarkMode && styles.darkSubtext]}>
-            Supports 300+ payment methods including cards, bank transfers, and digital wallets
+            {selectedPaymentProvider === 'Alchemy Pay'
+              ? 'Supports cards, bank transfers, and digital wallets'
+              : 'Global provider with competitive rates and fast processing'}
           </Text>
-          <Text style={styles.paymentTotal}>Total: ${(fundingAmount * 1.025).toFixed(2)}</Text>
-        </TouchableOpacity>
-        
+          <Text style={styles.paymentFee}>Fee: {feePct * 100}%</Text>
+          <Text style={styles.paymentTotal}>Total: ${total}</Text>
+          <Text style={styles.paymentTotal}>Est. HBAR: {estHBAR.toFixed(2)}</Text>
+
+          <TouchableOpacity
+            style={[styles.primaryButton, isDarkMode && styles.darkPrimaryButton]}
+            onPress={() => handlePaymentSelection(selectedPaymentProvider)}
+          >
+            <Text style={styles.buttonText}>Continue with {selectedPaymentProvider}</Text>
+          </TouchableOpacity>
+        </View>
+
         <TouchableOpacity
-          style={[styles.paymentOption, isDarkMode && styles.darkPaymentOption]}
-          onPress={() => handlePaymentSelection('Banxa')}
+          style={[styles.secondaryButton, isDarkMode && styles.darkSecondaryButton]}
+          onPress={() => setCurrentStep(0)}
         >
-          <View style={styles.paymentOptionHeader}>
-            <Text style={[styles.paymentProviderName, isDarkMode && styles.darkText]}>
-              Banxa
-            </Text>
-            <Text style={styles.paymentFee}>Fee: 3.0%</Text>
-          </View>
-          <Text style={[styles.paymentDescription, isDarkMode && styles.darkSubtext]}>
-            Global payment provider with competitive rates and fast processing
+          <Text style={[styles.secondaryButtonText, isDarkMode && styles.darkText]}>
+            Back to Details
           </Text>
-          <Text style={styles.paymentTotal}>Total: ${(fundingAmount * 1.03).toFixed(2)}</Text>
         </TouchableOpacity>
       </View>
-      
-      <TouchableOpacity
-        style={[styles.secondaryButton, isDarkMode && styles.darkSecondaryButton]}
-        onPress={() => setCurrentStep(0)}
-      >
-        <Text style={[styles.secondaryButtonText, isDarkMode && styles.darkText]}>
-          Back to Details
-        </Text>
-      </TouchableOpacity>
-    </View>
-  );
+    );
+  };
 
   // Step 2: Funding Process
   const renderFundingStep = () => (
@@ -386,7 +394,7 @@ const OnboardingFlow: React.FC<OnboardingFlowProps> = ({ onComplete, onCancel })
   };
 
   // Handle payment selection
-  const handlePaymentSelection = async (provider: string) => {
+  const handlePaymentSelection = async (provider: 'Alchemy Pay' | 'Banxa') => {
     setSelectedPaymentProvider(provider);
     setCurrentStep(2);
     setPaymentStatus('processing');
@@ -395,9 +403,9 @@ const OnboardingFlow: React.FC<OnboardingFlowProps> = ({ onComplete, onCancel })
     try {
       // Show payment options with different charges
       const paymentResult = await PaymentService.showPaymentOptions(
-        fundingAmount, 
-        userDetails.email, 
-        'temp-user-id' // Will be updated after user creation
+        fundingAmount,
+        userDetails.email,
+        'temp-user-id'
       );
       
       if (!paymentResult) {
@@ -449,23 +457,19 @@ const OnboardingFlow: React.FC<OnboardingFlowProps> = ({ onComplete, onCancel })
       
       // Create user in database first
       const newUser = await DatabaseService.createUser({
-        id: `user_${Date.now()}`,
         firstName: userDetails.firstName,
         lastName: userDetails.lastName,
         email: userDetails.email,
-        passwordHash: PasswordUtils.hashPassword(userDetails.password),
-        createdAt: new Date().toISOString(),
-        isActive: true,
-        hasWallet: false
+        passwordHash: PasswordUtils.hashPassword(userDetails.password)
       });
       
       // Create self-funded wallet
+      const provider = selectedPaymentProvider === 'Alchemy Pay' ? 'alchemy' : 'banxa';
       const fundingResult = await SelfFundedWalletManager.createSelfFundedWallet({
         userId: newUser.id,
         amount: fundingAmount,
-        hbarAmount: 100, // Default HBAR amount
-        paymentMethod: selectedPaymentProvider!,
-        transactionId: `tx_${Date.now()}`
+        provider: provider,
+        userEmail: userDetails.email
       });
       
       if (!fundingResult.success) {
@@ -598,7 +602,7 @@ const styles = StyleSheet.create({
   },
   headerContainer: {
     marginBottom: 16,
-    alignItems: 'flex-end',
+    alignItems: 'center',
   },
   closeButton: {
     padding: 8,
@@ -857,6 +861,47 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.3,
     shadowRadius: 4,
     elevation: 2,
+  },
+  // Tab styles
+  tabRow: {
+    flexDirection: 'row',
+    backgroundColor: '#ecf0f1',
+    borderRadius: 8,
+    marginBottom: 16,
+    padding: 4,
+  },
+  darkTabRow: {
+    backgroundColor: '#34495e',
+  },
+  tabButton: {
+    flex: 1,
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    borderRadius: 6,
+    alignItems: 'center',
+  },
+  activeTabButton: {
+    backgroundColor: '#3498db',
+    shadowColor: '#3498db',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  tabText: {
+    fontSize: 14,
+    fontWeight: '500',
+    color: '#7f8c8d',
+  },
+  activeTabText: {
+    color: '#ffffff',
+    fontWeight: '600',
+  },
+  tabPanel: {
+    backgroundColor: '#f8f9fa',
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 16,
   },
 });
 

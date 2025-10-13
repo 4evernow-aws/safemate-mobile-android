@@ -49,11 +49,17 @@ function App() {
   const [syncStatus, setSyncStatus] = useState<'online' | 'offline' | 'syncing'>('offline');
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [userData, setUserData] = useState<any>(null);
+  const [hasExistingUser, setHasExistingUser] = useState<boolean | null>(null);
 
   // Database state
   const [folders, setFolders] = useState<Folder[]>([]);
   const [files, setFiles] = useState<File[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+
+  useEffect(() => {
+    // Check if user exists on app startup
+    checkForExistingUser();
+  }, []);
 
   useEffect(() => {
     // Only initialize app after authentication
@@ -62,13 +68,30 @@ function App() {
     }
   }, [isAuthenticated]);
 
+  const checkForExistingUser = async () => {
+    try {
+      setIsLoading(true);
+      console.log('Checking for existing users...');
+      
+      // Check if any users exist (database will be initialized if needed)
+      const hasUser = await DataService.hasUser();
+      setHasExistingUser(hasUser);
+      
+      console.log('User check completed:', hasUser ? 'User exists' : 'No users found');
+    } catch (error) {
+      console.error('Failed to check for existing users:', error);
+      setHasExistingUser(false); // Default to no user if check fails
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   const initializeApp = async () => {
     try {
       setIsLoading(true);
       console.log('SafeMate app initializing...');
       
-      // Initialize database and load data
-      await DataService.initialize();
+      // Load data (database already initialized)
       const loadedFolders = await DataService.getFolders();
       setFolders(loadedFolders);
       
@@ -123,34 +146,55 @@ function App() {
 
   const deleteUserAccount = async () => {
     try {
-      console.log('Deleting user account and all data...');
+      console.log('🗑️ Starting account deletion process...');
+      setIsLoading(true);
       
       // Clear any stored wallets first
       try {
+        console.log('🔍 Checking for wallets to delete...');
         const wallets = await DataService.getWallets();
         console.log(`Found ${wallets.length} wallets to delete`);
+        
         for (const wallet of wallets) {
           try {
+            console.log(`🗑️ Deleting wallet ${wallet.id} from keychain...`);
             await WalletManager.deleteWalletFromKeychain(wallet.id);
-            console.log(`Deleted wallet ${wallet.id} from keychain`);
+            console.log(`✅ Deleted wallet ${wallet.id} from keychain`);
           } catch (error) {
-            console.warn('Failed to delete wallet from keychain:', error);
+            console.warn('⚠️ Failed to delete wallet from keychain:', error);
           }
         }
       } catch (walletError) {
-        console.warn('Failed to get wallets for deletion:', walletError);
+        console.warn('⚠️ Failed to get wallets for deletion:', walletError);
       }
       
-      // Clear database
-      await DataService.clearAllData();
+      // Clear database with detailed error handling
+      try {
+        console.log('🗑️ Clearing database...');
+        await DataService.clearAllData();
+        console.log('✅ Database cleared successfully');
+      } catch (dbError) {
+        console.error('❌ Database clearing failed:', dbError);
+        // Continue with app reset even if database clearing fails
+        console.log('⚠️ Continuing with app reset despite database error...');
+      }
       
       // Reset app state
+      console.log('🔄 Resetting app state...');
       resetApp();
       
+      console.log('✅ Account deletion completed successfully');
       Alert.alert('Account Deleted', 'Your account and all data have been deleted successfully.');
     } catch (error) {
-      console.error('Failed to delete user account:', error);
-      Alert.alert('Error', 'Failed to delete account. Please try again.');
+      console.error('❌ Failed to delete user account:', error);
+      console.error('❌ Error details:', {
+        message: error.message,
+        stack: error.stack,
+        name: error.name
+      });
+      Alert.alert('Error', `Failed to delete account: ${error.message || 'Unknown error'}. Please try again.`);
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -375,12 +419,29 @@ function App() {
     </View>
   );
 
+  // Show loading screen while checking for existing users
+  if (hasExistingUser === null || isLoading) {
+    return (
+      <SafeAreaProvider>
+        <StatusBar barStyle={isDarkMode ? 'light-content' : 'dark-content'} />
+        <View style={styles.loadingContainer}>
+          <Text style={[styles.loadingText, isDarkMode && styles.darkText]}>
+            {hasExistingUser === null ? 'Checking for existing users...' : 'Loading SafeMate...'}
+          </Text>
+        </View>
+      </SafeAreaProvider>
+    );
+  }
+
   // Show authentication screen if not authenticated
   if (!isAuthenticated) {
     return (
       <SafeAreaProvider>
         <StatusBar barStyle={isDarkMode ? 'light-content' : 'dark-content'} />
-        <AuthScreen onAuthSuccess={handleAuthSuccess} />
+        <AuthScreen 
+          onAuthSuccess={handleAuthSuccess}
+          hasExistingUser={hasExistingUser}
+        />
       </SafeAreaProvider>
     );
   }

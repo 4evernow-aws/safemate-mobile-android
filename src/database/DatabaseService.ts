@@ -9,12 +9,11 @@ import {
   File, 
   Wallet, 
   SyncStatus, 
-  UserSettings, 
   BlockchainTransaction 
 } from '../types';
 
 class DatabaseService {
-  private db: SQLite.SQLiteDatabase | null = null;
+  private db: any | null = null;
   private readonly DB_NAME = 'SafeMate.db';
 
   /**
@@ -22,10 +21,7 @@ class DatabaseService {
    */
   async initialize(): Promise<void> {
     try {
-      this.db = SQLite.openDatabase({
-        name: this.DB_NAME,
-        location: 'default',
-      });
+      this.db = SQLite.openDatabase(this.DB_NAME);
 
       await this.createTables();
       console.log('SafeMate database initialized successfully');
@@ -33,6 +29,24 @@ class DatabaseService {
       console.error('Database initialization failed:', error);
       throw error;
     }
+  }
+
+  // Execute a SQL statement using a transaction and return a Promise with the ResultSet
+  private runSql(query: string, params: any[] = []): Promise<any> {
+    if (!this.db) return Promise.reject(new Error('Database not initialized'));
+    return new Promise((resolve, reject) => {
+      this.db.transaction((tx: any) => {
+        tx.executeSql(
+          query,
+          params,
+          (_tx: any, result: any) => resolve(result),
+          (_tx: any, error: any) => {
+            reject(error);
+            return false;
+          }
+        );
+      });
+    });
   }
 
   /**
@@ -261,7 +275,7 @@ class DatabaseService {
       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `;
 
-    await this.db.executeSql(query, [
+    await this.runSql(query, [
       newFolder.id,
       newFolder.name,
       newFolder.type,
@@ -282,14 +296,14 @@ class DatabaseService {
   async getFolders(): Promise<Folder[]> {
     if (!this.db) throw new Error('Database not initialized');
 
-    const [results] = await this.db.executeSql('SELECT * FROM folders ORDER BY lastModified DESC');
+    const results = await this.runSql('SELECT * FROM folders ORDER BY lastModified DESC');
     return this.mapFoldersFromResults(results);
   }
 
   async getFolderById(id: string): Promise<Folder | null> {
     if (!this.db) throw new Error('Database not initialized');
 
-    const [results] = await this.db.executeSql('SELECT * FROM folders WHERE id = ?', [id]);
+    const results = await this.runSql('SELECT * FROM folders WHERE id = ?', [id]);
     const folders = this.mapFoldersFromResults(results);
     return folders.length > 0 ? folders[0] : null;
   }
@@ -306,17 +320,17 @@ class DatabaseService {
     values.push(id);
 
     const query = `UPDATE folders SET ${setClause} WHERE id = ?`;
-    await this.db.executeSql(query, values);
+    await this.runSql(query, values);
   }
 
   async deleteFolder(id: string): Promise<void> {
     if (!this.db) throw new Error('Database not initialized');
 
     // Delete all files in the folder first
-    await this.db.executeSql('DELETE FROM files WHERE folderId = ?', [id]);
+    await this.runSql('DELETE FROM files WHERE folderId = ?', [id]);
     
     // Delete the folder
-    await this.db.executeSql('DELETE FROM folders WHERE id = ?', [id]);
+    await this.runSql('DELETE FROM folders WHERE id = ?', [id]);
   }
 
   // File Operations
@@ -341,7 +355,7 @@ class DatabaseService {
       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `;
 
-    await this.db.executeSql(query, [
+    await this.runSql(query, [
       newFile.id,
       newFile.name,
       newFile.originalName,
@@ -371,7 +385,7 @@ class DatabaseService {
   async getFilesByFolderId(folderId: string): Promise<File[]> {
     if (!this.db) throw new Error('Database not initialized');
 
-    const [results] = await this.db.executeSql(
+    const results = await this.runSql(
       'SELECT * FROM files WHERE folderId = ? ORDER BY uploadedAt DESC',
       [folderId]
     );
@@ -381,7 +395,7 @@ class DatabaseService {
   async getFileById(id: string): Promise<File | null> {
     if (!this.db) throw new Error('Database not initialized');
 
-    const [results] = await this.db.executeSql('SELECT * FROM files WHERE id = ?', [id]);
+    const results = await this.runSql('SELECT * FROM files WHERE id = ?', [id]);
     const files = this.mapFilesFromResults(results);
     return files.length > 0 ? files[0] : null;
   }
@@ -398,7 +412,7 @@ class DatabaseService {
     values.push(id);
 
     const query = `UPDATE files SET ${setClause} WHERE id = ?`;
-    await this.db.executeSql(query, values);
+    await this.runSql(query, values);
   }
 
   async deleteFile(id: string): Promise<void> {
@@ -408,7 +422,7 @@ class DatabaseService {
     const file = await this.getFileById(id);
     if (!file) return;
 
-    await this.db.executeSql('DELETE FROM files WHERE id = ?', [id]);
+    await this.runSql('DELETE FROM files WHERE id = ?', [id]);
     
     // Update folder file count
     await this.updateFolderFileCount(file.folderId);
@@ -418,19 +432,19 @@ class DatabaseService {
   private async updateFolderFileCount(folderId: string): Promise<void> {
     if (!this.db) throw new Error('Database not initialized');
 
-    const [results] = await this.db.executeSql(
+    const results = await this.runSql(
       'SELECT COUNT(*) as count FROM files WHERE folderId = ?',
       [folderId]
     );
     
     const count = results.rows.item(0).count;
-    await this.db.executeSql(
+    await this.runSql(
       'UPDATE folders SET fileCount = ?, lastModified = ? WHERE id = ?',
       [count, new Date().toISOString(), folderId]
     );
   }
 
-  private mapFoldersFromResults(results: SQLite.ResultSet): Folder[] {
+  private mapFoldersFromResults(results: any): Folder[] {
     const folders: Folder[] = [];
     for (let i = 0; i < results.rows.length; i++) {
       const row = results.rows.item(i);
@@ -452,7 +466,7 @@ class DatabaseService {
     return folders;
   }
 
-  private mapFilesFromResults(results: SQLite.ResultSet): File[] {
+  private mapFilesFromResults(results: any): File[] {
     const files: File[] = [];
     for (let i = 0; i < results.rows.length; i++) {
       const row = results.rows.item(i);
@@ -504,7 +518,7 @@ class DatabaseService {
       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
     `;
 
-    await this.db.executeSql(query, [
+    await this.runSql(query, [
       newWallet.id,
       newWallet.accountId,
       newWallet.publicKey,
@@ -522,14 +536,14 @@ class DatabaseService {
   async getWallets(): Promise<Wallet[]> {
     if (!this.db) throw new Error('Database not initialized');
 
-    const [results] = await this.db.executeSql('SELECT * FROM wallets ORDER BY createdAt DESC');
+    const results = await this.runSql('SELECT * FROM wallets ORDER BY createdAt DESC');
     return this.mapWalletsFromResults(results);
   }
 
   async getWalletById(id: string): Promise<Wallet | null> {
     if (!this.db) throw new Error('Database not initialized');
 
-    const [results] = await this.db.executeSql('SELECT * FROM wallets WHERE id = ?', [id]);
+    const results = await this.runSql('SELECT * FROM wallets WHERE id = ?', [id]);
     const wallets = this.mapWalletsFromResults(results);
     return wallets.length > 0 ? wallets[0] : null;
   }
@@ -546,7 +560,7 @@ class DatabaseService {
     values.push(id);
 
     const query = `UPDATE wallets SET ${setClause} WHERE id = ?`;
-    await this.db.executeSql(query, values);
+    await this.runSql(query, values);
   }
 
   // Sync Status Operations
@@ -562,13 +576,13 @@ class DatabaseService {
     values.push(entityId, entityType);
 
     const query = `UPDATE syncStatus SET ${setClause} WHERE entityId = ? AND entityType = ?`;
-    await this.db.executeSql(query, values);
+    await this.runSql(query, values);
   }
 
   async getPendingSyncItems(): Promise<SyncStatus[]> {
     if (!this.db) throw new Error('Database not initialized');
 
-    const [results] = await this.db.executeSql(
+    const results = await this.runSql(
       'SELECT * FROM syncStatus WHERE status IN (?, ?) ORDER BY lastAttempt ASC',
       ['pending', 'failed']
     );
@@ -578,7 +592,7 @@ class DatabaseService {
   async getPendingSyncItemsCount(): Promise<number> {
     if (!this.db) throw new Error('Database not initialized');
 
-    const [results] = await this.db.executeSql(
+    const results = await this.runSql(
       'SELECT COUNT(*) as count FROM syncStatus WHERE status IN (?, ?)',
       ['pending', 'failed']
     );
@@ -588,7 +602,7 @@ class DatabaseService {
   async getLastSyncTime(): Promise<Date | undefined> {
     if (!this.db) throw new Error('Database not initialized');
 
-    const [results] = await this.db.executeSql(
+    const results = await this.runSql(
       'SELECT MAX(lastAttempt) as lastSync FROM syncStatus WHERE status = ?',
       ['synced']
     );
@@ -615,7 +629,7 @@ class DatabaseService {
       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `;
 
-    await this.db.executeSql(query, [
+    await this.runSql(query, [
       newTransaction.id,
       newTransaction.transactionId,
       newTransaction.entityType,
@@ -633,7 +647,7 @@ class DatabaseService {
   }
 
   // Helper Methods
-  private mapWalletsFromResults(results: SQLite.ResultSet): Wallet[] {
+  private mapWalletsFromResults(results: any): Wallet[] {
     const wallets: Wallet[] = [];
     for (let i = 0; i < results.rows.length; i++) {
       const row = results.rows.item(i);
@@ -652,7 +666,7 @@ class DatabaseService {
     return wallets;
   }
 
-  private mapSyncStatusFromResults(results: SQLite.ResultSet): SyncStatus[] {
+  private mapSyncStatusFromResults(results: any): SyncStatus[] {
     const syncStatuses: SyncStatus[] = [];
     for (let i = 0; i < results.rows.length; i++) {
       const row = results.rows.item(i);
@@ -682,7 +696,7 @@ class DatabaseService {
     const userId = `user_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
     const now = new Date().toISOString();
 
-    await this.db.executeSql(
+    await this.runSql(
       `INSERT INTO users (id, firstName, lastName, email, passwordHash, createdAt, isActive, hasWallet) 
        VALUES (?, ?, ?, ?, ?, ?, 1, 0)`,
       [userId, userData.firstName, userData.lastName, userData.email, userData.passwordHash, now]
@@ -700,7 +714,7 @@ class DatabaseService {
   async getUserByEmail(email: string): Promise<{ id: string; email: string; firstName: string; lastName: string; hasWallet: boolean } | null> {
     if (!this.db) throw new Error('Database not initialized');
 
-    const [results] = await this.db.executeSql(
+    const results: any = await this.runSql(
       'SELECT id, email, firstName, lastName, hasWallet FROM users WHERE email = ? AND isActive = 1',
       [email]
     );
@@ -722,7 +736,7 @@ class DatabaseService {
   async hasUser(): Promise<boolean> {
     if (!this.db) throw new Error('Database not initialized');
 
-    const [results] = await this.db.executeSql(
+    const results: any = await this.runSql(
       'SELECT COUNT(*) as count FROM users WHERE isActive = 1'
     );
 
@@ -732,7 +746,7 @@ class DatabaseService {
   async updateUserWallet(userId: string, walletId: string): Promise<void> {
     if (!this.db) throw new Error('Database not initialized');
 
-    await this.db.executeSql(
+    await this.runSql(
       'UPDATE users SET hasWallet = 1, walletId = ? WHERE id = ?',
       [walletId, userId]
     );
@@ -743,7 +757,7 @@ class DatabaseService {
   async updateUserLastLogin(userId: string): Promise<void> {
     if (!this.db) throw new Error('Database not initialized');
 
-    await this.db.executeSql(
+    await this.runSql(
       'UPDATE users SET lastLogin = ? WHERE id = ?',
       [new Date().toISOString(), userId]
     );
@@ -759,13 +773,13 @@ class DatabaseService {
       console.log('Clearing all database tables...');
       
       // Delete all data from all tables
-      await this.db.executeSql('DELETE FROM blockchainTransactions');
-      await this.db.executeSql('DELETE FROM userSettings');
-      await this.db.executeSql('DELETE FROM syncStatus');
-      await this.db.executeSql('DELETE FROM wallets');
-      await this.db.executeSql('DELETE FROM files');
-      await this.db.executeSql('DELETE FROM folders');
-      await this.db.executeSql('DELETE FROM users');
+      await this.runSql('DELETE FROM blockchainTransactions');
+      await this.runSql('DELETE FROM userSettings');
+      await this.runSql('DELETE FROM syncStatus');
+      await this.runSql('DELETE FROM wallets');
+      await this.runSql('DELETE FROM files');
+      await this.runSql('DELETE FROM folders');
+      await this.runSql('DELETE FROM users');
       
       console.log('All database tables cleared successfully');
     } catch (error) {

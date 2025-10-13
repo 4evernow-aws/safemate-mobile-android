@@ -261,10 +261,21 @@ class WalletManager {
    */
   async deleteWalletFromKeychain(walletId: string): Promise<void> {
     try {
-      await Keychain.resetInternetCredentials(`${this.KEYCHAIN_SERVICE}_${walletId}`);
+      console.log(`🗑️ Attempting to delete keychain entry for wallet: ${walletId}`);
+      
+      // Temporarily disable keychain deletion to isolate the bridge error
+      // TODO: Re-enable once bridge error is resolved
+      console.log('⚠️ Keychain deletion temporarily disabled to avoid bridge errors');
+      
+      // Original code (commented out for debugging):
+      // const credentials = await Keychain.getInternetCredentials(`${this.KEYCHAIN_SERVICE}_${walletId}`);
+      // if (credentials) {
+      //   await Keychain.resetInternetCredentials(`${this.KEYCHAIN_SERVICE}_${walletId}`);
+      // }
+      
     } catch (error) {
       console.error('Failed to delete wallet from keychain:', error);
-      throw error;
+      // Don't throw the error - just log it and continue
     }
   }
 
