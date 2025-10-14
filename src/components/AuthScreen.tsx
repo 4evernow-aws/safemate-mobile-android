@@ -45,7 +45,7 @@ const PLANS: Plan[] = [
     name: 'Personal',
     price: 100,
     description: 'Perfect for individuals and families',
-    features: ['Up to 10GB storage', 'Personal document encryption', 'Family photo backup'],
+    features: ['Secured on the blockchain', 'Personal document encryption', 'Family photo backup'],
     color: '#3498db'
   },
   {
@@ -53,7 +53,7 @@ const PLANS: Plan[] = [
     name: 'Community',
     price: 150,
     description: 'Ideal for small groups and communities',
-    features: ['Up to 50GB storage', 'Advanced encryption', 'Community collaboration tools'],
+    features: ['Secured on the blockchain', 'Advanced encryption', 'Community collaboration tools'],
     color: '#e74c3c'
   },
   {
@@ -61,7 +61,7 @@ const PLANS: Plan[] = [
     name: 'Business',
     price: 200,
     description: 'Complete solution for businesses',
-    features: ['Unlimited storage', 'Enterprise-grade security', 'Advanced analytics'],
+    features: ['Secured on the blockchain', 'Enterprise-grade security', 'Advanced analytics'],
     color: '#27ae60'
   }
 ];
@@ -1041,7 +1041,7 @@ const styles = StyleSheet.create({
     marginBottom: 16,
   },
   logoTitle: {
-    fontSize: 24,
+    fontSize: 22,
     fontWeight: 'bold',
     color: '#3498db',
   },
@@ -1164,7 +1164,7 @@ const styles = StyleSheet.create({
     color: '#2c3e50',
   },
   price: {
-    fontSize: 32,
+    fontSize: 22,
     color: '#2c3e50',
     fontWeight: 'bold',
   },
