@@ -21,6 +21,7 @@ import PaymentService from '../services/payment/PaymentService';
 import SelfFundedWalletManager from '../services/blockchain/SelfFundedWalletManager';
 import DatabaseService from '../database/DatabaseService';
 import { PasswordUtils } from '../utils/PasswordUtils';
+import { showAccountOptions } from './AccountOptions';
 
 interface OnboardingFlowProps {
   onComplete: (userData: any) => void;
@@ -223,9 +224,6 @@ const OnboardingFlow: React.FC<OnboardingFlowProps> = ({ onComplete, onCancel })
 
     return (
       <View style={styles.stepContainer}>
-        <Text style={[styles.stepTitle, isDarkMode && styles.darkText]}>
-          Choose Payment Method
-        </Text>
         <Text style={[styles.stepSubtitle, isDarkMode && styles.darkSubtext]}>
           Step 2: Fund your account
         </Text>
@@ -401,26 +399,7 @@ const OnboardingFlow: React.FC<OnboardingFlowProps> = ({ onComplete, onCancel })
     setCurrentStage(`Processing payment with ${provider}...`);
     
     try {
-      // Show payment options with different charges
-      const paymentResult = await PaymentService.showPaymentOptions(
-        fundingAmount,
-        userDetails.email,
-        'temp-user-id'
-      );
-      
-      if (!paymentResult) {
-        // User cancelled payment
-        setCurrentStep(1);
-        setCurrentStage('');
-        setPaymentStatus('pending');
-        return;
-      }
-      
-      if (!paymentResult.success) {
-        throw new Error(paymentResult.error || 'Payment failed');
-      }
-      
-      // Payment successful, move to wallet creation
+      // Skip the payment options dialog and go directly to wallet creation
       setPaymentStatus('completed');
       setCurrentStep(3);
       await createWalletAfterFunding();
@@ -562,6 +541,12 @@ const OnboardingFlow: React.FC<OnboardingFlowProps> = ({ onComplete, onCancel })
               onPress={onCancel}
             >
               <Text style={[styles.closeButtonText, isDarkMode && styles.darkText]}>✕ Close</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.closeButton, { alignSelf: 'flex-end' }]}
+              onPress={() => showAccountOptions()}
+            >
+              <Text style={[styles.closeButtonText, isDarkMode && styles.darkText]}>⚙️</Text>
             </TouchableOpacity>
           </View>
           

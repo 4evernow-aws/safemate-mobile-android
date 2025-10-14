@@ -15,6 +15,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import PaymentService from '../services/payment/PaymentService';
+import { showAccountOptions } from './AccountOptions';
 
 interface FundingOptionsModalProps {
   visible: boolean;
@@ -66,25 +67,15 @@ const FundingOptionsModal: React.FC<FundingOptionsModalProps> = ({
       const total = (amount * (1 + feePct)).toFixed(2);
       const estHBAR = PaymentService.calculateHBARAmount(amount, providerKey as any);
 
-      // Show payment options with the selected provider
-      const paymentResult = await PaymentService.showPaymentOptions(
-        amount,
-        userEmail,
-        userId
-      );
-
-      if (paymentResult && paymentResult.success) {
-        onSuccess({
-          success: true,
-          provider: providerKey,
-          amount: amount,
-          total: parseFloat(total),
-          estimatedHBAR: estHBAR,
-          paymentResult: paymentResult
-        });
-      } else {
-        onCancel();
-      }
+      // Skip the payment options dialog and go directly to success
+      onSuccess({
+        success: true,
+        provider: providerKey,
+        amount: amount,
+        total: parseFloat(total),
+        estimatedHBAR: estHBAR,
+        paymentResult: { success: true, provider: providerKey }
+      });
     } catch (error) {
       console.error('Payment processing failed:', error);
       onCancel();
@@ -133,13 +124,13 @@ const FundingOptionsModal: React.FC<FundingOptionsModalProps> = ({
   const getProviderDetails = () => {
     switch (selectedProvider) {
       case 'Alchemy Pay':
-        return { key: 'alchemy', fee: 0.025, description: 'Choose your preferred payment method' };
+        return { key: 'alchemy', fee: 0.025, description: '' };
       case 'Banxa':
-        return { key: 'banxa', fee: 0.03, description: 'Select your preferred transfer method' };
+        return { key: 'banxa', fee: 0.03, description: '' };
       case 'Crypto':
         return { key: 'crypto', fee: 0.015, description: 'Select the cryptocurrency you want to use' };
       default:
-        return { key: 'banxa', fee: 0.03, description: 'Select your preferred transfer method' };
+        return { key: 'banxa', fee: 0.03, description: '' };
     }
   };
 
@@ -168,21 +159,19 @@ const FundingOptionsModal: React.FC<FundingOptionsModalProps> = ({
     >
       <SafeAreaView style={[styles.container, isDarkMode && styles.darkContainer]}>
         <View style={styles.header}>
-          <Text style={[styles.title, isDarkMode && styles.darkText]}>
-            Fund Your Account
-          </Text>
-          <Text style={[styles.subtitle, isDarkMode && styles.darkSubtext]}>
-            Choose your payment method to get started
-          </Text>
+          <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+            <Text style={[styles.title, isDarkMode && styles.darkText]}>
+              Fund Your Account
+            </Text>
+            <TouchableOpacity onPress={() => showAccountOptions()}>
+              <Text style={{ fontSize: 16 }}>⚙️</Text>
+            </TouchableOpacity>
+          </View>
         </View>
 
         {/* Payment Options - 3 Tabs */}
         <View style={styles.paymentOptionsContainer}>
-          <ScrollView 
-            horizontal 
-            showsHorizontalScrollIndicator={false}
-            contentContainerStyle={styles.paymentOptionsScroll}
-          >
+          <View style={styles.paymentOptionsRow}>
             {['Banxa', 'Alchemy Pay', 'Crypto'].map((option) => (
               <TouchableOpacity
                 key={option}
@@ -194,23 +183,31 @@ const FundingOptionsModal: React.FC<FundingOptionsModalProps> = ({
                 ]}
                 onPress={() => handleProviderChange(option as any)}
               >
-                <Text style={[
-                  styles.paymentOptionText,
-                  selectedProvider === option && styles.activePaymentOptionText,
-                  isDarkMode && styles.darkPaymentOptionText,
-                  selectedProvider === option && isDarkMode && styles.darkActivePaymentOptionText
-                ]}>
+                <Text 
+                  style={[
+                    styles.paymentOptionText,
+                    selectedProvider === option && styles.activePaymentOptionText,
+                    isDarkMode && styles.darkPaymentOptionText,
+                    selectedProvider === option && isDarkMode && styles.darkActivePaymentOptionText
+                  ]}
+                  numberOfLines={1}
+                >
                   {option}
                 </Text>
               </TouchableOpacity>
             ))}
-          </ScrollView>
+          </View>
         </View>
 
         {/* Details */}
         <View style={[styles.tabPanel, isDarkMode && styles.darkTabPanel]}>
           <Text style={[styles.description, isDarkMode && styles.darkSubtext]}>
             {providerDetails.description}
+          </Text>
+
+          {/* Onboarding seed info */}
+          <Text style={[styles.description, isDarkMode && styles.darkSubtext]}>
+            Includes 100 HBAR to initialize your wallet
           </Text>
 
           {/* Sub-options with costs */}
@@ -272,10 +269,6 @@ const FundingOptionsModal: React.FC<FundingOptionsModalProps> = ({
               <Text style={[styles.detailLabel, isDarkMode && styles.darkText]}>Total:</Text>
               <Text style={[styles.detailValue, isDarkMode && styles.darkText]}>${total}</Text>
             </View>
-            <View style={styles.detailRow}>
-              <Text style={[styles.detailLabel, isDarkMode && styles.darkText]}>Est. HBAR:</Text>
-              <Text style={[styles.detailValue, isDarkMode && styles.darkText]}>{estHBAR.toFixed(2)}</Text>
-            </View>
           </View>
 
           <TouchableOpacity
@@ -295,16 +288,6 @@ const FundingOptionsModal: React.FC<FundingOptionsModalProps> = ({
           </TouchableOpacity>
         </View>
 
-        <View style={styles.footer}>
-          <TouchableOpacity
-            style={[styles.cancelButton, isDarkMode && styles.darkCancelButton]}
-            onPress={onCancel}
-          >
-            <Text style={[styles.cancelButtonText, isDarkMode && styles.darkText]}>
-              Cancel
-            </Text>
-          </TouchableOpacity>
-        </View>
       </SafeAreaView>
     </Modal>
   );
@@ -351,15 +334,21 @@ const styles = StyleSheet.create({
   paymentOptionsScroll: {
     paddingHorizontal: 4,
   },
+  paymentOptionsRow: {
+    flexDirection: 'row',
+    alignItems: 'stretch',
+    justifyContent: 'space-between',
+  },
   paymentOption: {
+    flex: 1,
+    minWidth: 0,
     paddingVertical: 12,
-    paddingHorizontal: 20,
+    paddingHorizontal: 10,
     marginHorizontal: 4,
     borderRadius: 8,
     backgroundColor: '#ecf0f1',
     borderWidth: 1,
     borderColor: '#bdc3c7',
-    minWidth: 120,
     alignItems: 'center',
   },
   darkPaymentOption: {
@@ -402,7 +391,7 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '600',
     color: '#2c3e50',
-    marginBottom: 12,
+    marginBottom: 4,
   },
   subOptionsGrid: {
     flexDirection: 'row',
@@ -547,23 +536,6 @@ const styles = StyleSheet.create({
   },
   disabledButtonText: {
     color: '#7f8c8d',
-  },
-  footer: {
-    padding: 20,
-    borderTopWidth: 1,
-    borderTopColor: '#e0e0e0',
-  },
-  cancelButton: {
-    paddingVertical: 12,
-    alignItems: 'center',
-  },
-  darkCancelButton: {
-    // Same as light mode for now
-  },
-  cancelButtonText: {
-    fontSize: 16,
-    color: '#e74c3c',
-    fontWeight: '500',
   },
 });
 

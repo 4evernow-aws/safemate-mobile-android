@@ -28,6 +28,8 @@ export interface FundingResult {
 
 class SelfFundedWalletManager {
   private static instance: SelfFundedWalletManager;
+  
+  private static readonly ONBOARDING_SEED_HBAR = 100;
 
   /**
    * Create a self-funded wallet with user payment
@@ -36,26 +38,12 @@ class SelfFundedWalletManager {
     try {
       console.log('Creating self-funded wallet with options:', options);
 
-      // Step 1: Show payment options to user
-      const paymentResponse = await PaymentService.showPaymentOptions(
-        options.amount,
-        options.userEmail,
-        options.userId
-      );
-
-      if (!paymentResponse) {
-        return {
-          success: false,
-          error: 'Payment cancelled by user',
-        };
-      }
-
-      if (!paymentResponse.success) {
-        return {
-          success: false,
-          error: paymentResponse.error || 'Payment creation failed',
-        };
-      }
+      // Step 1: Skip payment options dialog and proceed directly
+      const paymentResponse = {
+        success: true,
+        provider: options.provider || 'banxa',
+        amount: options.amount
+      };
 
       // Step 2: Create wallet with simulated account (for TESTNET development)
       console.log('Creating wallet with simulated Hedera account...');
@@ -66,7 +54,7 @@ class SelfFundedWalletManager {
         transactionId: paymentResponse.transactionId!,
         amount: options.amount,
         provider: options.provider,
-        estimatedHBAR: paymentResponse.estimatedCryptoAmount || 0,
+        estimatedHBAR: SelfFundedWalletManager.ONBOARDING_SEED_HBAR,
         paymentUrl: paymentResponse.paymentUrl,
       });
 
@@ -75,7 +63,7 @@ class SelfFundedWalletManager {
         wallet,
         paymentUrl: paymentResponse.paymentUrl,
         transactionId: paymentResponse.transactionId,
-        estimatedHBAR: paymentResponse.estimatedCryptoAmount,
+        estimatedHBAR: SelfFundedWalletManager.ONBOARDING_SEED_HBAR,
       };
     } catch (error) {
       console.error('Self-funded wallet creation failed:', error);
@@ -93,8 +81,14 @@ class SelfFundedWalletManager {
     try {
       // Generate simulated account data for TESTNET
       const simulatedAccountId = `0.0.${Math.floor(Math.random() * 1000000)}`;
-      const simulatedPrivateKey = `302e020100300506032b657004220420${Math.random().toString(16).substr(2, 64)}`;
-      const simulatedPublicKey = `302a300506032b6570032100${Math.random().toString(16).substr(2, 64)}`;
+      // Generate proper 32-byte private key (64 hex characters)
+      const privateKeyBytes = Array.from({length: 32}, () => Math.floor(Math.random() * 256));
+      const privateKeyHex = privateKeyBytes.map(b => b.toString(16).padStart(2, '0')).join('');
+      const simulatedPrivateKey = `302e020100300506032b657004220420${privateKeyHex}`;
+      // Generate proper 32-byte public key (64 hex characters)
+      const publicKeyBytes = Array.from({length: 32}, () => Math.floor(Math.random() * 256));
+      const publicKeyHex = publicKeyBytes.map(b => b.toString(16).padStart(2, '0')).join('');
+      const simulatedPublicKey = `302a300506032b6570032100${publicKeyHex}`;
 
       console.log('TESTNET: Creating account with simulated Hedera account:', simulatedAccountId);
 
@@ -103,13 +97,17 @@ class SelfFundedWalletManager {
         accountId: simulatedAccountId,
         publicKey: simulatedPublicKey,
         privateKey: simulatedPrivateKey,
-        balance: 100, // Simulated 100 HBAR balance
+        balance: SelfFundedWalletManager.ONBOARDING_SEED_HBAR,
         isActive: true,
         network: 'testnet',
       };
 
       // Save to database
       const savedWallet = await DatabaseService.createWallet(walletData);
+      
+      // Encrypt private key before storing in keychain
+      const encryptedPrivateKey = WalletManager.encryptPrivateKey(simulatedPrivateKey);
+      await WalletManager.storePrivateKeyInKeychain(savedWallet.id, encryptedPrivateKey);
       
       // Set wallet in Hedera service
       HederaService.setWallet(savedWallet);

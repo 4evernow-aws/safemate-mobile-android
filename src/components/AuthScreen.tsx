@@ -15,6 +15,7 @@ import {
   useColorScheme,
   KeyboardAvoidingView,
   Platform,
+  BackHandler,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import WalletManager from '../services/blockchain/WalletManager';
@@ -24,6 +25,7 @@ import CryptoService from '../services/CryptoService';
 import { PasswordUtils } from '../utils/PasswordUtils';
 import OnboardingFlow from './OnboardingFlow';
 import FundingOptionsModal from './FundingOptionsModal';
+import { showAccountOptions } from './AccountOptions';
 
 interface AuthScreenProps {
   onAuthSuccess: (userType: 'existing' | 'new', userData?: any) => void;
@@ -826,6 +828,11 @@ const AuthScreen: React.FC<AuthScreenProps> = ({ onAuthSuccess, hasExistingUser 
 
   return (
     <SafeAreaView style={[styles.container, isDarkMode && styles.darkContainer]}>
+      <View style={{ paddingHorizontal: 16, paddingTop: 8, alignItems: 'flex-end' }}>
+        <TouchableOpacity onPress={() => showAccountOptions({ onCloseApp: () => BackHandler.exitApp() }) }>
+          <Text style={{ fontSize: 18 }}>⚙️</Text>
+        </TouchableOpacity>
+      </View>
       <KeyboardAvoidingView
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         style={styles.keyboardContainer}

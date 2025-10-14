@@ -193,7 +193,7 @@ class WalletManager {
   /**
    * Encrypt private key
    */
-  private encryptPrivateKey(privateKey: string): string {
+  encryptPrivateKey(privateKey: string): string {
     try {
       const encrypted = CryptoJS.AES.encrypt(privateKey, this.ENCRYPTION_KEY).toString();
       return encrypted;
@@ -219,7 +219,7 @@ class WalletManager {
   /**
    * Store private key in keychain
    */
-  private async storePrivateKeyInKeychain(walletId: string, encryptedPrivateKey: string): Promise<void> {
+  async storePrivateKeyInKeychain(walletId: string, encryptedPrivateKey: string): Promise<void> {
     try {
       await Keychain.setInternetCredentials(
         `${this.KEYCHAIN_SERVICE}_${walletId}`,
