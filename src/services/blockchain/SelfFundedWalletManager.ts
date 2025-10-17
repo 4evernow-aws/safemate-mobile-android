@@ -15,6 +15,7 @@ export interface FundingOptions {
   provider: 'alchemy' | 'banxa';
   userEmail: string;
   userId: string;
+  estimatedHBAR?: number; // Optional estimated HBAR from payment provider
 }
 
 export interface FundingResult {
@@ -47,14 +48,15 @@ class SelfFundedWalletManager {
 
       // Step 2: Create wallet with simulated account (for TESTNET development)
       console.log('Creating wallet with simulated Hedera account...');
-      const wallet = await this.createWalletWithSimulatedAccount();
+      const actualEstimatedHBAR = options.estimatedHBAR || SelfFundedWalletManager.ONBOARDING_SEED_HBAR;
+      const wallet = await this.createWalletWithSimulatedAccount(actualEstimatedHBAR);
 
       // Step 3: Store payment information
       await this.storePaymentInfo(wallet.id, {
         transactionId: paymentResponse.transactionId!,
         amount: options.amount,
         provider: options.provider,
-        estimatedHBAR: SelfFundedWalletManager.ONBOARDING_SEED_HBAR,
+        estimatedHBAR: actualEstimatedHBAR,
         paymentUrl: paymentResponse.paymentUrl,
       });
 
@@ -63,7 +65,7 @@ class SelfFundedWalletManager {
         wallet,
         paymentUrl: paymentResponse.paymentUrl,
         transactionId: paymentResponse.transactionId,
-        estimatedHBAR: SelfFundedWalletManager.ONBOARDING_SEED_HBAR,
+        estimatedHBAR: actualEstimatedHBAR,
       };
     } catch (error) {
       console.error('Self-funded wallet creation failed:', error);
@@ -77,7 +79,7 @@ class SelfFundedWalletManager {
   /**
    * Create wallet with simulated Hedera account (for TESTNET development)
    */
-  private async createWalletWithSimulatedAccount(): Promise<Wallet> {
+  private async createWalletWithSimulatedAccount(estimatedHBAR: number = SelfFundedWalletManager.ONBOARDING_SEED_HBAR): Promise<Wallet> {
     try {
       // Generate simulated account data for TESTNET
       const simulatedAccountId = `0.0.${Math.floor(Math.random() * 1000000)}`;
@@ -90,14 +92,15 @@ class SelfFundedWalletManager {
       const publicKeyHex = publicKeyBytes.map(b => b.toString(16).padStart(2, '0')).join('');
       const simulatedPublicKey = `302a300506032b6570032100${publicKeyHex}`;
 
-      console.log('TESTNET: Creating account with simulated Hedera account:', simulatedAccountId);
+      // Convert HBAR to tinybars (1 HBAR = 100,000,000 tinybars)
+      const balanceInTinybars = Math.floor(estimatedHBAR * 100000000);
 
       // Create wallet object
       const walletData: Omit<Wallet, 'id' | 'createdAt' | 'lastSynced'> = {
         accountId: simulatedAccountId,
         publicKey: simulatedPublicKey,
         privateKey: simulatedPrivateKey,
-        balance: SelfFundedWalletManager.ONBOARDING_SEED_HBAR,
+        balance: balanceInTinybars,
         isActive: true,
         network: 'testnet',
       };
@@ -112,7 +115,6 @@ class SelfFundedWalletManager {
       // Set wallet in Hedera service
       HederaService.setWallet(savedWallet);
 
-      console.log('TESTNET: Self-funded account created successfully:', savedWallet.accountId);
       return savedWallet;
     } catch (error) {
       console.error('Failed to create account with simulated Hedera account:', error);

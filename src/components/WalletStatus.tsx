@@ -40,6 +40,7 @@ const AccountDetails: React.FC<AccountDetailsProps> = ({ connected, userData }) 
     ? userData.accountId 
     : 'Unknown';
 
+
   // HBAR to AUD conversion rate (this would typically come from an API)
   const HBAR_TO_AUD_RATE = 0.05; // Example rate: 1 HBAR = $0.05 AUD
 
@@ -126,6 +127,7 @@ const AccountDetails: React.FC<AccountDetailsProps> = ({ connected, userData }) 
               </Text>
             </View>
           </View>
+
 
           {/* Balance Section */}
           {hederaAccountNumber !== 'Unknown' && (

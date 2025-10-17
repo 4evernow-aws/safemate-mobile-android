@@ -413,16 +413,25 @@ const AuthScreen: React.FC<AuthScreenProps> = ({ onAuthSuccess, hasExistingUser 
         provider: result.provider,
         userEmail: pendingUser.email,
         userId: pendingUser.id,
+        estimatedHBAR: result.estimatedHBAR, // Pass the actual estimated HBAR
       });
 
       if (walletResult && walletResult.success) {
         // Update user record with account info
         await DatabaseService.updateUserWallet(pendingUser.id, walletResult.wallet!.id);
         
-        // Show success message
+        
+        // Show success message with payment details
         Alert.alert(
           'Account Created Successfully! 🎉',
-          `Welcome to SafeMate, ${pendingUser.firstName}! Your account has been created with Hedera blockchain integration.`,
+          `Welcome to SafeMate, ${pendingUser.firstName}!\n\n` +
+          `💰 Payment Details:\n` +
+          `• Amount Paid: $${result.amount}\n` +
+          `• Total (with fees): $${result.total}\n` +
+          `• Estimated HBAR: ${result.estimatedHBAR}\n` +
+          `• Provider: ${result.provider}\n\n` +
+          `✅ Hedera Account: ${walletResult.wallet!.accountId}\n` +
+          `✅ Your blockchain account is ready!`,
           [
             {
               text: 'Continue',
@@ -434,7 +443,8 @@ const AuthScreen: React.FC<AuthScreenProps> = ({ onAuthSuccess, hasExistingUser 
                   email: pendingUser.email, 
                   type: 'email',
                   hasWallet: true,
-                  accountId: walletResult.wallet!.accountId
+                  accountId: walletResult.wallet!.accountId,
+                  walletId: walletResult.wallet!.id
                 });
               }
             }
