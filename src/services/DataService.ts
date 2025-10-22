@@ -16,14 +16,25 @@ class DataService {
     if (this.isInitialized) return;
 
     try {
-      await DatabaseService.initialize();
-      await this.initializeDefaultData();
+      // Add timeout to prevent infinite initialization
+      const timeoutPromise = new Promise((_, reject) => {
+        setTimeout(() => reject(new Error('DataService initialization timeout')), 15000); // 15 second timeout
+      });
+      
+      const initPromise = this.performInitialization();
+      await Promise.race([initPromise, timeoutPromise]);
+      
       this.isInitialized = true;
       console.log('DataService initialized successfully');
     } catch (error) {
       console.error('DataService initialization failed:', error);
       throw error;
     }
+  }
+
+  private async performInitialization(): Promise<void> {
+    await DatabaseService.initialize();
+    await this.initializeDefaultData();
   }
 
   /**

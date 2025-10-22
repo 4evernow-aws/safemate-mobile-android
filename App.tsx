@@ -73,10 +73,16 @@ function App() {
       setIsLoading(true);
       console.log('Checking for existing users...');
       
-      // Check if any users exist (database will be initialized if needed)
-      const hasUser = await DataService.hasUser();
-      setHasExistingUser(hasUser);
+      // Add timeout to prevent infinite loading
+      const timeoutPromise = new Promise((_, reject) => {
+        setTimeout(() => reject(new Error('User check timeout')), 10000); // 10 second timeout
+      });
       
+      // Check if any users exist (database will be initialized if needed)
+      const hasUserPromise = DataService.hasUser();
+      const hasUser = await Promise.race([hasUserPromise, timeoutPromise]) as boolean;
+      
+      setHasExistingUser(hasUser);
       console.log('User check completed:', hasUser ? 'User exists' : 'No users found');
     } catch (error) {
       console.error('Failed to check for existing users:', error);
@@ -428,6 +434,16 @@ function App() {
           <Text style={[styles.loadingText, isDarkMode && styles.darkText]}>
             {hasExistingUser === null ? 'Checking for existing users...' : 'Loading SafeMate...'}
           </Text>
+          <TouchableOpacity 
+            style={styles.forceContinueButton}
+            onPress={() => {
+              console.log('🔄 Force continue pressed - bypassing user check');
+              setHasExistingUser(false);
+              setIsLoading(false);
+            }}
+          >
+            <Text style={styles.forceContinueText}>🔄 Force Continue</Text>
+          </TouchableOpacity>
         </View>
       </SafeAreaProvider>
     );
@@ -581,6 +597,18 @@ const styles = StyleSheet.create({
   },
   darkLogoutButtonText: {
     color: '#ffffff',
+  },
+  forceContinueButton: {
+    backgroundColor: '#3498db',
+    padding: 12,
+    borderRadius: 8,
+    marginTop: 20,
+    alignItems: 'center',
+  },
+  forceContinueText: {
+    color: '#ffffff',
+    fontSize: 16,
+    fontWeight: 'bold',
   },
 });
 

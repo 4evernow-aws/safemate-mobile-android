@@ -140,6 +140,14 @@ const AuthScreen: React.FC<AuthScreenProps> = ({ onAuthSuccess, hasExistingUser 
     }
 
     setIsLoading(true);
+    
+    // Add timeout to prevent infinite loading
+    const loadingTimeout = setTimeout(() => {
+      console.log('⚠️ Sign-in loading timeout - clearing loading state');
+      setIsLoading(false);
+      setCurrentStage('');
+    }, 30000); // 30 second timeout
+    
     try {
       // Initialize database first
       setCurrentStage('Initializing database...');
@@ -260,6 +268,7 @@ const AuthScreen: React.FC<AuthScreenProps> = ({ onAuthSuccess, hasExistingUser 
       console.error('Sign in error:', error);
       Alert.alert('Sign In Failed', 'Unable to access your account. Please try again.');
     } finally {
+      clearTimeout(loadingTimeout);
       setIsLoading(false);
       setCurrentStage('');
     }
@@ -290,6 +299,14 @@ const AuthScreen: React.FC<AuthScreenProps> = ({ onAuthSuccess, hasExistingUser 
 
     setIsLoading(true);
     console.log('Starting signup process...');
+    
+    // Add timeout to prevent infinite loading
+    const loadingTimeout = setTimeout(() => {
+      console.log('⚠️ Loading timeout - clearing loading state');
+      setIsLoading(false);
+      setCurrentStage('');
+    }, 30000); // 30 second timeout
+    
     try {
       // Step 1: Initialize database first
       setCurrentStage('Initializing database...');
@@ -394,6 +411,7 @@ const AuthScreen: React.FC<AuthScreenProps> = ({ onAuthSuccess, hasExistingUser 
       const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
       Alert.alert('Sign Up Failed', `Failed to create account: ${errorMessage}`);
     } finally {
+      clearTimeout(loadingTimeout);
       setIsLoading(false);
       setIsCreatingWallet(false);
       setCurrentStage('');
@@ -838,7 +856,19 @@ const AuthScreen: React.FC<AuthScreenProps> = ({ onAuthSuccess, hasExistingUser 
 
   return (
     <SafeAreaView style={[styles.container, isDarkMode && styles.darkContainer]}>
-      <View style={{ paddingHorizontal: 16, paddingTop: 8, alignItems: 'flex-end' }}>
+      <View style={{ paddingHorizontal: 16, paddingTop: 8, alignItems: 'flex-end', flexDirection: 'row', justifyContent: 'space-between' }}>
+        <TouchableOpacity 
+          onPress={() => {
+            console.log('🔄 Force refresh pressed');
+            setIsLoading(false);
+            setCurrentStage('');
+            setShowPlanSelection(false);
+            setAuthMode('options');
+          }}
+          style={{ padding: 8, backgroundColor: '#3498db', borderRadius: 20 }}
+        >
+          <Text style={{ fontSize: 16, color: 'white' }}>🔄</Text>
+        </TouchableOpacity>
         <TouchableOpacity onPress={() => showAccountOptions({ onCloseApp: () => BackHandler.exitApp() }) }>
           <Text style={{ fontSize: 18 }}>⚙️</Text>
         </TouchableOpacity>
