@@ -20,7 +20,11 @@ DerivedData
 *.hmap
 *.ipa
 *.xcuserstate
+<<<<<<< HEAD
 project.xcworkspace
+=======
+**/.xcode.env.local
+>>>>>>> origin/master
 
 # Android/IntelliJ
 #
@@ -33,6 +37,10 @@ local.properties
 .cxx/
 *.keystore
 !debug.keystore
+<<<<<<< HEAD
+=======
+.kotlin/
+>>>>>>> origin/master
 
 # node.js
 #
@@ -40,12 +48,15 @@ node_modules/
 npm-debug.log
 yarn-error.log
 
+<<<<<<< HEAD
 # BUCK
 buck-out/
 \.buckd/
 *.keystore
 !debug.keystore
 
+=======
+>>>>>>> origin/master
 # fastlane
 #
 # It is recommended to not store the screenshots in the git repo. Instead, use fastlane to re-generate the
@@ -53,6 +64,7 @@ buck-out/
 # For more information about the recommended setup visit:
 # https://docs.fastlane.tools/best-practices/source-control/
 
+<<<<<<< HEAD
 */fastlane/report.xml
 */fastlane/Preview.html
 */fastlane/screenshots
@@ -73,10 +85,24 @@ web-build/
 
 # Flipper
 Flipper-Folly
+=======
+**/fastlane/report.xml
+**/fastlane/Preview.html
+**/fastlane/screenshots
+**/fastlane/test_output
+
+# Bundle artifact
+*.jsbundle
+
+# Ruby / CocoaPods
+**/Pods/
+/vendor/bundle/
+>>>>>>> origin/master
 
 # Temporary files created by Metro to check the health of the file watcher
 .metro-health-check*
 
+<<<<<<< HEAD
 # Environment variables
 .env
 .env.local
@@ -169,3 +195,15 @@ temp/
 *.njsproj
 *.sln
 *.sw?
+=======
+# testing
+/coverage
+
+# Yarn
+.yarn/*
+!.yarn/patches
+!.yarn/plugins
+!.yarn/releases
+!.yarn/sdks
+!.yarn/versions
+>>>>>>> origin/master

@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 /**
  * Babel configuration for SafeMate Android
  * JavaScript/TypeScript transpilation configuration
@@ -23,4 +24,8 @@ module.exports = {
       },
     ],
   ],
+=======
+module.exports = {
+  presets: ['module:@react-native/babel-preset'],
+>>>>>>> origin/master
 };
