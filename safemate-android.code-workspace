@@ -1,0 +1,31 @@
+{
+    "folders": [
+        {
+            "path": "d:\\safemate-mobile-android",
+            "name": "SafeMate Android"
+        }
+    ],
+    "settings": {
+        "terminal.integrated.cwd": "d:\\safemate-mobile-android",
+        "terminal.integrated.defaultProfile.windows": "PowerShell",
+        "terminal.integrated.profiles.windows": {
+            "PowerShell": {
+                "source": "PowerShell",
+                "args": ["-NoExit", "-Command", "cd 'd:\\safemate-mobile-android'"]
+            }
+        },
+        "files.defaultLanguage": "typescript",
+        "typescript.preferences.includePackageJsonAutoImports": "on",
+        "editor.formatOnSave": true,
+        "editor.codeActionsOnSave": {
+            "source.fixAll.eslint": true
+        }
+    },
+    "extensions": {
+        "recommendations": [
+            "ms-vscode.vscode-typescript-next",
+            "bradlc.vscode-tailwindcss",
+            "esbenp.prettier-vscode"
+        ]
+    }
+}
