@@ -4,7 +4,7 @@
  */
 
 import SQLite from 'react-native-sqlite-2';
-import { Folder, File, User } from '../types';
+import { Folder, File, User, Wallet } from '../types';
 
 class DatabaseService {
   private db: SQLite.SQLiteDatabase | null = null;
@@ -367,21 +367,36 @@ class DatabaseService {
    * Wallet Management
    */
   async createWallet(walletData: {
-    address: string;
-    privateKey: string;
+    accountId: string;
     publicKey: string;
-    userId: string;
-  }): Promise<void> {
+    privateKey: string;
+    balance: number;
+    isActive: boolean;
+    network: string;
+  }): Promise<Wallet> {
     if (!this.db) throw new Error('Database not initialized');
 
     const walletId = this.generateId();
+    const wallet: Wallet = {
+      id: walletId,
+      accountId: walletData.accountId,
+      publicKey: walletData.publicKey,
+      privateKey: walletData.privateKey,
+      balance: walletData.balance,
+      isActive: walletData.isActive,
+      network: walletData.network,
+      createdAt: new Date(),
+      lastSynced: new Date(),
+    };
 
     await this.db.transaction(tx => {
       tx.executeSql(
-        'INSERT INTO wallets (id, address, privateKey, publicKey, userId, createdAt) VALUES (?, ?, ?, ?, ?, ?)',
-        [walletId, walletData.address, walletData.privateKey, walletData.publicKey, walletData.userId, new Date().toISOString()]
+        'INSERT INTO wallets (id, accountId, publicKey, privateKey, balance, isActive, network, createdAt, lastSynced) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
+        [walletId, walletData.accountId, walletData.publicKey, walletData.privateKey, walletData.balance, walletData.isActive ? 1 : 0, walletData.network, wallet.createdAt.toISOString(), wallet.lastSynced.toISOString()]
       );
     });
+
+    return wallet;
   }
 
   async getWallets(userId?: string): Promise<any[]> {
