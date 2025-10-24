@@ -72,16 +72,16 @@ function App() {
     try {
       setIsLoading(true);
       console.log('Checking for existing users...');
-      
+
       // Add timeout to prevent infinite loading
       const timeoutPromise = new Promise((_, reject) => {
         setTimeout(() => reject(new Error('User check timeout')), 10000); // 10 second timeout
       });
-      
+
       // Check if any users exist (database will be initialized if needed)
       const hasUserPromise = DataService.hasUser();
       const hasUser = await Promise.race([hasUserPromise, timeoutPromise]) as boolean;
-      
+
       setHasExistingUser(hasUser);
       console.log('User check completed:', hasUser ? 'User exists' : 'No users found');
     } catch (error) {
@@ -96,11 +96,11 @@ function App() {
     try {
       setIsLoading(true);
       console.log('SafeMate app initializing...');
-      
+
       // Load data (database already initialized)
       const loadedFolders = await DataService.getFolders();
       setFolders(loadedFolders);
-      
+
       // Initialize blockchain services (with error handling)
       try {
         await BlockchainSyncService.initialize();
@@ -109,7 +109,7 @@ function App() {
         console.warn('Blockchain services failed to initialize:', blockchainError);
         // Continue without blockchain services for now
       }
-      
+
       // Check wallet status (with error handling)
       try {
         const hasWallet = await WalletManager.hasWallet();
@@ -118,7 +118,7 @@ function App() {
         console.warn('Wallet check failed:', walletError);
         setWalletConnected(false);
       }
-      
+
       // Check network connectivity (with error handling)
       try {
         const isOnline = await WalletManager.checkNetworkConnectivity();
@@ -127,7 +127,7 @@ function App() {
         console.warn('Network check failed:', networkError);
         setSyncStatus('offline');
       }
-      
+
       console.log('SafeMate app initialized successfully');
     } catch (error) {
       console.error('Failed to initialize SafeMate app:', error);
@@ -154,13 +154,13 @@ function App() {
     try {
       console.log('🗑️ Starting account deletion process...');
       setIsLoading(true);
-      
+
       // Clear any stored wallets first
       try {
         console.log('🔍 Checking for wallets to delete...');
         const wallets = await DataService.getWallets();
         console.log(`Found ${wallets.length} wallets to delete`);
-        
+
         for (const wallet of wallets) {
           try {
             console.log(`🗑️ Deleting wallet ${wallet.id} from keychain...`);
@@ -173,7 +173,7 @@ function App() {
       } catch (walletError) {
         console.warn('⚠️ Failed to get wallets for deletion:', walletError);
       }
-      
+
       // Clear database with detailed error handling
       try {
         console.log('🗑️ Clearing database...');
@@ -184,11 +184,11 @@ function App() {
         // Continue with app reset even if database clearing fails
         console.log('⚠️ Continuing with app reset despite database error...');
       }
-      
+
       // Reset app state
       console.log('🔄 Resetting app state...');
       resetApp();
-      
+
       console.log('✅ Account deletion completed successfully');
       Alert.alert('Account Deleted', 'Your account and all data have been deleted successfully.');
     } catch (error) {
@@ -204,45 +204,45 @@ function App() {
     }
   };
 
-          const handleAuthSuccess = async (userType: 'existing' | 'new', userData?: any) => {
-            console.log('Authentication successful:', userType, userData);
-            setUserData(userData);
-            setIsAuthenticated(true);
-            setIsLoading(false); // Set loading to false since we're authenticated
-            
-            if (userType === 'new' && userData?.type === 'wallet') {
-              setWalletConnected(true);
-              Alert.alert('Success', 'Blockchain wallet created successfully!');
-            } else if (userType === 'new') {
-              // Handle new user with wallet creation
-              if (userData?.hasWallet) {
-                setWalletConnected(true);
-                console.log('New account created with Hedera wallet:', userData.wallet);
-              } else if (userData?.walletError) {
-                console.warn('Account created but wallet creation failed:', userData.walletError);
-                setWalletConnected(false);
-                
-                // Test crypto functionality to help debug
-                try {
-                  const cryptoTest = await WalletManager.testCryptoFunctionality();
-                  console.log('Crypto test after wallet creation failure:', cryptoTest);
-                } catch (testError) {
-                  console.error('Crypto test failed:', testError);
-                }
-              } else {
-                console.log('New account created without wallet');
-                setWalletConnected(false);
-              }
-            } else {
-              Alert.alert('Welcome Back!', 'You have been signed in successfully.');
-            }
-          };
+  const handleAuthSuccess = async (userType: 'existing' | 'new', userData?: any) => {
+    console.log('Authentication successful:', userType, userData);
+    setUserData(userData);
+    setIsAuthenticated(true);
+    setIsLoading(false); // Set loading to false since we're authenticated
+
+    if (userType === 'new' && userData?.type === 'wallet') {
+      setWalletConnected(true);
+      Alert.alert('Success', 'Blockchain wallet created successfully!');
+    } else if (userType === 'new') {
+      // Handle new user with wallet creation
+      if (userData?.hasWallet) {
+        setWalletConnected(true);
+        console.log('New account created with Hedera wallet:', userData.wallet);
+      } else if (userData?.walletError) {
+        console.warn('Account created but wallet creation failed:', userData.walletError);
+        setWalletConnected(false);
+
+        // Test crypto functionality to help debug
+        try {
+          const cryptoTest = await WalletManager.testCryptoFunctionality();
+          console.log('Crypto test after wallet creation failure:', cryptoTest);
+        } catch (testError) {
+          console.error('Crypto test failed:', testError);
+        }
+      } else {
+        console.log('New account created without wallet');
+        setWalletConnected(false);
+      }
+    } else {
+      Alert.alert('Welcome Back!', 'You have been signed in successfully.');
+    }
+  };
 
   const handleFolderPress = async (folder: Folder) => {
     try {
       setSelectedFolder(folder);
       setCurrentView('folder');
-      
+
       // Load files for this folder from database
       const folderFiles = await DataService.getFilesByFolderId(folder.id);
       setFiles(folderFiles);
@@ -263,13 +263,13 @@ function App() {
       'Enter folder name:',
       [
         { text: 'Cancel', style: 'cancel' },
-        { 
-          text: 'Create', 
+        {
+          text: 'Create',
           onPress: async (folderName) => {
             if (folderName && folderName.trim()) {
               try {
                 console.log('Creating folder:', folderName.trim());
-                
+
                 // Create folder in database
                 const newFolder = await DataService.createFolder({
                   name: folderName.trim(),
@@ -278,9 +278,9 @@ function App() {
                   isBlockchain: true,
                   isEncrypted: true,
                 });
-                
+
                 console.log('Folder created in database:', newFolder.id);
-                
+
                 // Sync folder to blockchain to create NFT
                 if (walletConnected && newFolder.isBlockchain) {
                   console.log('Syncing folder to blockchain...');
@@ -289,20 +289,20 @@ function App() {
                     if (syncResult.success) {
                       console.log('Folder synced to blockchain successfully:', syncResult.blockchainTokenId);
                       Alert.alert(
-                        'Success! 🎉', 
+                        'Success! 🎉',
                         `Folder "${folderName.trim()}" created successfully!\n\nBlockchain NFT: ${syncResult.blockchainTokenId}`
                       );
                     } else {
                       console.warn('Blockchain sync failed:', syncResult.error);
                       Alert.alert(
-                        'Folder Created (Offline)', 
+                        'Folder Created (Offline)',
                         `Folder "${folderName.trim()}" created locally. It will sync to blockchain when online.`
                       );
                     }
                   } catch (syncError) {
                     console.error('Blockchain sync error:', syncError);
                     Alert.alert(
-                      'Folder Created (Offline)', 
+                      'Folder Created (Offline)',
                       `Folder "${folderName.trim()}" created locally. It will sync to blockchain when online.`
                     );
                   }
@@ -310,11 +310,11 @@ function App() {
                   console.log('Wallet not connected or folder not set for blockchain');
                   Alert.alert('Success', `Folder "${folderName.trim()}" created successfully!`);
                 }
-                
+
                 // Refresh folders list
                 const updatedFolders = await DataService.getFolders();
                 setFolders(updatedFolders);
-                
+
               } catch (error) {
                 console.error('Failed to create folder:', error);
                 Alert.alert('Error', 'Failed to create folder');
@@ -351,57 +351,57 @@ function App() {
 
     return (
       <ScrollView style={styles.content}>
-        <AccountDetails 
+        <AccountDetails
           connected={walletConnected}
           userData={userData}
         />
         <SyncStatus status={syncStatus} />
-        
+
         <View style={styles.section}>
           <Text style={[styles.sectionTitle, isDarkMode && styles.darkText]}>
             Your Folders ({folders.length})
           </Text>
-          <EnhancedFolderGrid 
+          <EnhancedFolderGrid
             folders={folders}
             onFolderPress={handleFolderPress}
           />
         </View>
 
-                <View style={styles.actionButtons}>
-                  <TouchableOpacity
-                    style={[styles.actionButton, styles.primaryButton]}
-                    onPress={handleCreateFolder}
-                  >
-                    <Text style={styles.buttonText}>Create Folder</Text>
-                  </TouchableOpacity>
+        <View style={styles.actionButtons}>
+          <TouchableOpacity
+            style={[styles.actionButton, styles.primaryButton]}
+            onPress={handleCreateFolder}
+          >
+            <Text style={styles.buttonText}>Create Folder</Text>
+          </TouchableOpacity>
 
-                  <TouchableOpacity
-                    style={[styles.actionButton, styles.secondaryButton]}
-                    onPress={handleUploadFile}
-                  >
-                    <Text style={styles.buttonText}>Upload File</Text>
-                  </TouchableOpacity>
-                </View>
+          <TouchableOpacity
+            style={[styles.actionButton, styles.secondaryButton]}
+            onPress={handleUploadFile}
+          >
+            <Text style={styles.buttonText}>Upload File</Text>
+          </TouchableOpacity>
+        </View>
 
-                <View style={styles.logoutSection}>
-                  <TouchableOpacity
-                    style={[styles.logoutButton, isDarkMode && styles.darkLogoutButton]}
-                    onPress={() => {
-                      Alert.alert(
-                        'Sign Out',
-                        'Are you sure you want to sign out?',
-                        [
-                          { text: 'Cancel', style: 'cancel' },
-                          { text: 'Sign Out', onPress: resetApp, style: 'destructive' }
-                        ]
-                      );
-                    }}
-                  >
-                    <Text style={[styles.logoutButtonText, isDarkMode && styles.darkLogoutButtonText]}>
-                      Sign Out
-                    </Text>
-                  </TouchableOpacity>
-                </View>
+        <View style={styles.logoutSection}>
+          <TouchableOpacity
+            style={[styles.logoutButton, isDarkMode && styles.darkLogoutButton]}
+            onPress={() => {
+              Alert.alert(
+                'Sign Out',
+                'Are you sure you want to sign out?',
+                [
+                  { text: 'Cancel', style: 'cancel' },
+                  { text: 'Sign Out', onPress: resetApp, style: 'destructive' }
+                ]
+              );
+            }}
+          >
+            <Text style={[styles.logoutButtonText, isDarkMode && styles.darkLogoutButtonText]}>
+              Sign Out
+            </Text>
+          </TouchableOpacity>
+        </View>
       </ScrollView>
     );
   };
@@ -416,8 +416,8 @@ function App() {
           {selectedFolder?.name}
         </Text>
       </View>
-      
-      <FileList 
+
+      <FileList
         files={files}
         folder={selectedFolder}
         onFilePress={(file) => console.log('File pressed:', file)}
@@ -434,7 +434,7 @@ function App() {
           <Text style={[styles.loadingText, isDarkMode && styles.darkText]}>
             {hasExistingUser === null ? 'Checking for existing users...' : 'Loading SafeMate...'}
           </Text>
-          <TouchableOpacity 
+          <TouchableOpacity
             style={styles.forceContinueButton}
             onPress={() => {
               console.log('🔄 Force continue pressed - bypassing user check');
@@ -454,7 +454,7 @@ function App() {
     return (
       <SafeAreaProvider>
         <StatusBar barStyle={isDarkMode ? 'light-content' : 'dark-content'} />
-        <AuthScreen 
+        <AuthScreen
           onAuthSuccess={handleAuthSuccess}
           hasExistingUser={hasExistingUser}
         />
@@ -466,7 +466,7 @@ function App() {
     <SafeAreaProvider>
       <StatusBar barStyle={isDarkMode ? 'light-content' : 'dark-content'} />
       <SafeAreaView style={[styles.container, isDarkMode && styles.darkContainer]}>
-        <EnhancedHeader 
+        <EnhancedHeader
           title="SafeMate"
           subtitle="Keeping your data and legacy safe"
           onMenuPress={() => {
@@ -476,21 +476,23 @@ function App() {
               [
                 { text: 'Cancel', style: 'cancel' },
                 { text: 'Sign Out', onPress: resetApp },
-                { text: 'Delete Account', onPress: () => {
-                  Alert.alert(
-                    'Delete Account',
-                    'This will permanently delete your account and all data. This action cannot be undone.',
-                    [
-                      { text: 'Cancel', style: 'cancel' },
-                      { text: 'Delete', onPress: deleteUserAccount, style: 'destructive' }
-                    ]
-                  );
-                }, style: 'destructive' }
+                {
+                  text: 'Delete Account', onPress: () => {
+                    Alert.alert(
+                      'Delete Account',
+                      'This will permanently delete your account and all data. This action cannot be undone.',
+                      [
+                        { text: 'Cancel', style: 'cancel' },
+                        { text: 'Delete', onPress: deleteUserAccount, style: 'destructive' }
+                      ]
+                    );
+                  }, style: 'destructive'
+                }
               ]
             );
           }}
         />
-        
+
         {currentView === 'home' && renderHomeView()}
         {currentView === 'folder' && renderFolderView()}
       </SafeAreaView>

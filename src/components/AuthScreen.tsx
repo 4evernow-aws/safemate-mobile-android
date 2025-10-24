@@ -88,14 +88,12 @@ const AuthScreen: React.FC<AuthScreenProps> = ({ onAuthSuccess, hasExistingUser 
   const [selectedPlan, setSelectedPlan] = useState<Plan | null>(null);
   const [showPlanSelection, setShowPlanSelection] = useState(false);
   const [showOnboarding, setShowOnboarding] = useState(false);
+  const [lastSignUpTime, setLastSignUpTime] = useState(0);
 
-  // Update auth mode based on user existence
+  // Update auth mode based on user existence - moved to be called after all useState hooks
   useEffect(() => {
-    if (hasExistingUser) {
-      setAuthMode('signin');
-    } else {
-      setAuthMode('signup');
-    }
+    // Always start with signin mode (Welcome Back)
+    setAuthMode('signin');
   }, [hasExistingUser]);
 
   // Password strength calculation
@@ -280,6 +278,14 @@ const AuthScreen: React.FC<AuthScreenProps> = ({ onAuthSuccess, hasExistingUser 
       console.log('Signup already in progress, ignoring duplicate request');
       return;
     }
+
+    // Debounce mechanism - prevent rapid successive clicks
+    const now = Date.now();
+    if (now - lastSignUpTime < 2000) { // 2 second debounce
+      console.log('Signup debounced - too soon after last attempt');
+      return;
+    }
+    setLastSignUpTime(now);
 
     if (!firstName || !lastName || !email || !password || !confirmPassword) {
       Alert.alert('Error', 'Please fill in all fields');
@@ -632,7 +638,7 @@ const AuthScreen: React.FC<AuthScreenProps> = ({ onAuthSuccess, hasExistingUser 
         onPress={() => setAuthMode('signup')}
       >
         <Text style={[styles.linkText, isDarkMode && styles.darkText]}>
-          Don't have an account? Sign Up
+          Don't have an account? Sign up
         </Text>
       </TouchableOpacity>
     </View>
@@ -707,6 +713,17 @@ const AuthScreen: React.FC<AuthScreenProps> = ({ onAuthSuccess, hasExistingUser 
           <Text style={[styles.passwordStrengthText, { color: getPasswordStrength(password).color }]}>
             Password Strength: {getPasswordStrength(password).strength}
           </Text>
+          <View style={styles.passwordStrengthBar}>
+            <View 
+              style={[
+                styles.passwordStrengthBarFill, 
+                { 
+                  width: `${(getPasswordStrength(password).strength === 'Weak' ? 33 : getPasswordStrength(password).strength === 'Medium' ? 66 : 100)}%`,
+                  backgroundColor: getPasswordStrength(password).color
+                }
+              ]} 
+            />
+          </View>
         </View>
       )}
 
@@ -777,7 +794,7 @@ const AuthScreen: React.FC<AuthScreenProps> = ({ onAuthSuccess, hasExistingUser 
         onPress={() => setAuthMode('signin')}
       >
         <Text style={[styles.linkText, isDarkMode && styles.darkText]}>
-          Already have an account? Sign In
+          Already have an account? Sign in
         </Text>
       </TouchableOpacity>
     </View>
@@ -839,51 +856,38 @@ const AuthScreen: React.FC<AuthScreenProps> = ({ onAuthSuccess, hasExistingUser 
     </View>
   );
 
-  // Show onboarding flow if enabled
-  if (showOnboarding) {
-    return (
-      <OnboardingFlow
-        onComplete={(userData) => {
-          setShowOnboarding(false);
-          onAuthSuccess('new', userData);
-        }}
-        onCancel={() => {
-          setShowOnboarding(false);
-        }}
-      />
-    );
-  }
-
   return (
     <SafeAreaView style={[styles.container, isDarkMode && styles.darkContainer]}>
-      <View style={{ paddingHorizontal: 16, paddingTop: 8, alignItems: 'flex-end', flexDirection: 'row', justifyContent: 'space-between' }}>
-        <TouchableOpacity 
-          onPress={() => {
-            console.log('🔄 Force refresh pressed');
-            setIsLoading(false);
-            setCurrentStage('');
-            setShowPlanSelection(false);
-            setAuthMode('options');
+      {showOnboarding ? (
+        <OnboardingFlow
+          onComplete={(userData) => {
+            setShowOnboarding(false);
+            onAuthSuccess('new', userData);
           }}
-          style={{ padding: 8, backgroundColor: '#3498db', borderRadius: 20 }}
-        >
-          <Text style={{ fontSize: 16, color: 'white' }}>🔄</Text>
-        </TouchableOpacity>
-        <TouchableOpacity onPress={() => showAccountOptions({ onCloseApp: () => BackHandler.exitApp() }) }>
-          <Text style={{ fontSize: 18 }}>⚙️</Text>
-        </TouchableOpacity>
-      </View>
-      <KeyboardAvoidingView
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-        style={styles.keyboardContainer}
-      >
-        <ScrollView contentContainerStyle={styles.scrollContainer}>
-          {showPlanSelection && renderPlanSelection()}
-          {!showPlanSelection && authMode === 'signin' && renderSignInForm()}
-          {!showPlanSelection && authMode === 'signup' && renderSignUpForm()}
-          {!showPlanSelection && authMode === 'options' && renderAuthOptions()}
-        </ScrollView>
-      </KeyboardAvoidingView>
+          onCancel={() => {
+            setShowOnboarding(false);
+          }}
+        />
+      ) : (
+        <>
+          <View style={{ paddingHorizontal: 16, paddingTop: 8, alignItems: 'flex-end', flexDirection: 'row', justifyContent: 'flex-end' }}>
+            <TouchableOpacity onPress={() => showAccountOptions({ onCloseApp: () => BackHandler.exitApp() }) }>
+              <Text style={{ fontSize: 18 }}>⚙️</Text>
+            </TouchableOpacity>
+          </View>
+          <KeyboardAvoidingView
+            behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+            style={styles.keyboardContainer}
+          >
+            <ScrollView contentContainerStyle={styles.scrollContainer}>
+              {showPlanSelection && renderPlanSelection()}
+              {!showPlanSelection && authMode === 'signin' && renderSignInForm()}
+              {!showPlanSelection && authMode === 'signup' && renderSignUpForm()}
+              {!showPlanSelection && authMode === 'options' && renderAuthOptions()}
+            </ScrollView>
+          </KeyboardAvoidingView>
+        </>
+      )}
       
       {/* Funding Options Modal */}
       <FundingOptionsModal
@@ -1099,6 +1103,18 @@ const styles = StyleSheet.create({
   passwordStrengthText: {
     fontSize: 12,
     fontWeight: '500',
+  },
+  passwordStrengthBar: {
+    height: 4,
+    backgroundColor: '#ecf0f1',
+    borderRadius: 2,
+    marginTop: 4,
+    overflow: 'hidden',
+  },
+  passwordStrengthBarFill: {
+    height: '100%',
+    borderRadius: 2,
+    transition: 'width 0.3s ease',
   },
   passwordMatchContainer: {
     marginTop: -8,
