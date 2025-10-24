@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>SafeMate Vault Icon Generator</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; background: #f5f5f5; }
+        .container { max-width: 800px; margin: 0 auto; background: white; padding: 20px; border-radius: 10px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
+        .header { text-align: center; color: #2c3e50; margin-bottom: 30px; }
+        .step { margin: 20px 0; padding: 15px; background: #ecf0f1; border-radius: 5px; }
+        .step h3 { color: #e74c3c; margin-top: 0; }
+        .code { background: #2c3e50; color: #ecf0f1; padding: 10px; border-radius: 5px; font-family: monospace; }
+        .button { background: #e74c3c; color: white; padding: 10px 20px; border: none; border-radius: 5px; cursor: pointer; text-decoration: none; display: inline-block; }
+        .button:hover { background: #c0392b; }
+        .icon-preview { text-align: center; margin: 20px 0; }
+        .vault-icon { width: 100px; height: 100px; background: linear-gradient(145deg, #2c3e50, #34495e); border-radius: 15px; margin: 0 auto; position: relative; box-shadow: 0 5px 15px rgba(0,0,0,0.3); }
+        .vault-door { width: 60px; height: 70px; background: linear-gradient(145deg, #34495e, #2c3e50); border-radius: 8px; position: absolute; top: 15px; left: 20px; }
+        .vault-handle { width: 12px; height: 12px; background: #e74c3c; border-radius: 50%; position: absolute; top: 35px; right: 10px; }
+        .vault-lock { width: 6px; height: 6px; background: #f39c12; border-radius: 50%; position: absolute; top: 30px; right: 15px; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🔒 SafeMate Vault Icon Generator</h1>
+            <p>Complete setup for your SafeMate Android app icon</p>
+        </div>
+        
+        <div class="step">
+            <h3>Step 1: Prepare Your Vault Image</h3>
+            <p>Save your vault image as a high-resolution PNG file. Make sure it's square (1:1 aspect ratio) and has good quality.</p>
+        </div>
+        
+        <div class="step">
+            <h3>Step 2: Generate Android Icons</h3>
+            <p>Use one of these online tools to generate all required Android icon sizes:</p>
+            <ul>
+                <li><strong>icon.kitchen</strong> - <a href="https://icon.kitchen/" target="_blank">https://icon.kitchen/</a> (Recommended)</li>
+                <li><strong>appicon.co</strong> - <a href="https://appicon.co/" target="_blank">https://appicon.co/</a></li>
+                <li><strong>Android Asset Studio</strong> - <a href="https://romannurik.github.io/AndroidAssetStudio/" target="_blank">https://romannurik.github.io/AndroidAssetStudio/</a></li>
+            </ul>
+        </div>
+        
+        <div class="step">
+            <h3>Step 3: Download All Sizes</h3>
+            <p>Generate and download icons for all these sizes:</p>
+            <div class="code">
+                mdpi: 48×48px<br>
+                hdpi: 72×72px<br>
+                xhdpi: 96×96px<br>
+                xxhdpi: 144×144px<br>
+                xxxhdpi: 192×192px
+            </div>
+        </div>
+        
+        <div class="step">
+            <h3>Step 4: Place Files in Directories</h3>
+            <p>Save the PNG files in these directories:</p>
+            <div class="code">
+                android/app/src/main/res/mipmap-mdpi/<br>
+                android/app/src/main/res/mipmap-hdpi/<br>
+                android/app/src/main/res/mipmap-xhdpi/<br>
+                android/app/src/main/res/mipmap-xxhdpi/<br>
+                android/app/src/main/res/mipmap-xxxhdpi/
+            </div>
+        </div>
+        
+        <div class="step">
+            <h3>Step 5: Test Your App</h3>
+            <p>Build and run your Android app to see the new vault icon:</p>
+            <div class="code">npm run android</div>
+        </div>
+        
+        <div class="icon-preview">
+            <h3>Vault Icon Preview</h3>
+            <div class="vault-icon">
+                <div class="vault-door">
+                    <div class="vault-handle"></div>
+                    <div class="vault-lock"></div>
+                </div>
+            </div>
+            <p>Your vault image will look great as the SafeMate app icon!</p>
+        </div>
+        
+        <div class="step">
+            <h3>✅ Complete Setup</h3>
+            <p>Once you've completed all steps, your SafeMate Android app will have a professional vault icon that perfectly represents the security and file protection features.</p>
+        </div>
+    </div>
+</body>
+</html>
